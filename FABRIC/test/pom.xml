@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project>
+	<modelVersion>4.0.0</modelVersion>
+	<groupId>com.deepis</groupId>
+	<artifactId>deepis-fabric-test</artifactId>
+	<name>${project.artifactId}</name>
+	<packaging>pom</packaging>
+	<version>1.0.0</version>
+
+        <!-- pulls in test and common properties / dependencies -->
+        <parent>
+                <groupId>com.deepis</groupId>
+                <artifactId>deepis-maven</artifactId>
+                <version>1.0.0</version>
+        </parent>
+
+	<properties>
+		<maven.antrun.version>1.6</maven.antrun.version>
+		<package.binaries.dir>${basedir}/binaries</package.binaries.dir>
+		<fabric.binaries.dir>${basedir}/../build</fabric.binaries.dir>
+	</properties>
+
+        <dependencies>
+		<dependency>
+                        <groupId>com.deepis</groupId>
+                        <artifactId>deepis-common</artifactId>
+                        <version>${project.version}</version>
+                        <type>pom</type>
+                </dependency>
+		<dependency>
+                        <groupId>com.deepis</groupId>
+                        <artifactId>deepis-fabric-cxx</artifactId>
+                        <version>${project.version}</version>
+                        <type>pom</type>
+                </dependency>
+        </dependencies>
+
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-antrun-plugin</artifactId>
+				<version>${maven.antrun.version}</version>
+				<dependencies>
+					<dependency>
+						<groupId>com.deepis</groupId>
+						<artifactId>deepis-ant-dependencies</artifactId>
+						<version>${project.version}</version>
+						<type>pom</type>
+					</dependency>
+				 </dependencies>
+				<executions>
+					<execution>
+						<id>${artifactId}-clean</id>
+						<phase>clean</phase>
+						<configuration>
+						<target>
+						  <delete verbose="true" includeemptydirs="true" failonerror="false">
+						    <fileset dir="${package.binaries.dir}"/>
+						  </delete>
+
+						  <delete verbose="true" includeemptydirs="true" failonerror="false">
+						    <fileset dir="dist"/>
+						  </delete>
+
+						  <delete verbose="true" includeemptydirs="true" failonerror="false">
+						    <fileset dir="deep_test_tools.egg-info"/>
+						  </delete>
+
+						  <delete verbose="true" includeemptydirs="true" failonerror="false">
+						    <fileset file="MANIFEST"/>
+						  </delete>
+
+						  <delete verbose="true" includeemptydirs="true" failonerror="false">
+						    <fileset dir="deep-test-tools-0.1"/>
+						  </delete>
+						</target>
+						</configuration>
+						<goals>
+							<goal>run</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>${artifactId}-initialize</id>
+						<phase>initialize</phase>
+						<configuration>
+						<target>
+						  <mkdir dir="${package.binaries.dir}"/>
+						</target>
+						</configuration>
+						<goals>
+							<goal>run</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>${artifactId}-generate-resources</id>
+						<phase>generate-resources</phase>
+						<configuration>
+							<target>
+							  <copy verbose="true" overwrite="true" flatten="true" file="../build/deepis-fabric" todir="${package.binaries.dir}"/>
+							</target>
+						</configuration>
+						<goals>
+							<goal>run</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>${artifactId}-compile</id>
+						<phase>compile</phase>
+						<configuration>
+							<target>
+								<exec executable="python" failonerror="true">
+									<arg value="setup.py"/>
+									<arg value="sdist"/>
+								</exec>
+							</target>
+						</configuration>
+						<goals>
+							<goal>run</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>${artifactId}-process-classes-source</id>
+						<phase>process-classes</phase>
+						<configuration>
+						</configuration>
+						<goals>
+							<goal>run</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>${artifactId}-test</id>
+						<phase>test</phase>
+						<configuration>
+						</configuration>
+						<goals>
+							<goal>run</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
+	</build>
+</project>

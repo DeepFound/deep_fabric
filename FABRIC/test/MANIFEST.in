@@ -1,0 +1,4 @@
+include setup.py
+include LICENSE
+include binaries/deepis-fabric
+include scripts/demo/*.sql

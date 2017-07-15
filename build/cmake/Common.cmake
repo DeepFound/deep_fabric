@@ -101,9 +101,9 @@ if (NOT ${CMAKE_PROJECT_NAME} STREQUAL "deepis-tinyxml"
 
 endif()
 
-if (${CMAKE_PROJECT_NAME} STREQUAL "deepis-fabric-cxx")
+if (${CMAKE_PROJECT_NAME} STREQUAL "deepis-fabric")
   # common
-  find_package(deepis-common-cxx REQUIRED)
+  find_package(deepis-common REQUIRED)
   set(DEEPIS_STANDARD_LIBS ${DEEPIS_STANDARD_LIBS} ${DEEPIS_COMMON_LIB})
   set(DEEPIS_STANDARD_INCS ${DEEPIS_STANDARD_INCS} ${DEEPIS_COMMON_INC})
 endif()

@@ -27,11 +27,14 @@
 				<module>THIRDPARTY</module>
 
 				<!-- ********************** -->
-				<!-- deepis components   -->
+				<!-- deepis components      -->
 				<!-- ********************** -->
 
 				<module>PLATFORM</module>
 				<module>ENGINE</module>
+				<module>STORE</module>
+				<module>COMMON</module>
+				<module>FABRIC</module>
 			</modules>
 		</profile>
 		<profile>
@@ -41,6 +44,9 @@
 				<module>THIRDPARTY</module>
 				<module>PLATFORM</module>
 				<module>ENGINE</module>
+				<module>STORE</module>
+				<module>COMMON</module>
+				<module>FABRIC</module>
 			</modules>
 		</profile>
 	</profiles>

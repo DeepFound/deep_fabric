@@ -91,6 +91,9 @@ const nbyte* Converter<nbyte*>::RESERVE = (nbyte*)&Converter<nbyte*>::NULL_VALUE
 const CompositeKey* Converter<CompositeKey*>::NULL_VALUE = null;
 const CompositeKey* Converter<CompositeKey*>::RESERVE = (CompositeKey*)&Converter<CompositeKey*>::NULL_VALUE;
 
+const voidptr Converter<voidptr>::NULL_VALUE = null;
+const voidptr Converter<voidptr>::RESERVE = (voidptr)&Converter<voidptr>::NULL_VALUE;
+
 } } // namespace
 
 #endif /* CXX_UTIL_CONVERTER_CXX_ */

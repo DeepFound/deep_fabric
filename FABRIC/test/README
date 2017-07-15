@@ -1,0 +1,19 @@
+Deep multi slave / replication demo 
+
+1. You will need 3 different machines. One will be the master, and the two others will be slaves. The demo will insert 100 million rows into a SQL database on the master, which will replicate the data to each of the slaves. On completion, the demo will print the total time, as well as confirm the row counts on the slave machines.
+
+2. unzip the provided tarball (tar -xvf deep-test-tools-0.1.tar.gz). Run the python installer (sudo python setup.py install --force). The necessary binaries will be placed in /usr/local/bin and the sql scripts will be palced in /usr/local/deep-demo. Do this on each of the 3 machines.
+
+2. Place the script /usr/local/bin/demo.sh on each of the three machines in the directory where you wish the database to be created. Edit the demo.sh script on each of these machines. Change SERVER_NUM to 1 on the master, 2 on the first slave, and 3 on the second slave. Change SERVER_IP to the IP address of the machine on which it has been placed.
+
+3. Place the script /usr/local/bin/demo2.sh in the same directory as the demo.sh script. Edit the script and change MASTER_IP to the master IP address, SLAVE1_IP to the first slave's IP address, and SLAVE2_IP to the second slave's IP address. This only needs to be done on the master.
+
+4. Generate the insert statements on the master using the provided makeInserts.py tool (in /usr/local/bin/). Running the script (>python makeInserts.py) will generate a file (inserts.sql) with 100 million rows, split into extended inserts of size 1000 each. Place this file in the same directory as the demo2.sh script on the master machine. 
+
+5. Run the demo.sh script on each of the machines in the background (./demo.sh &), starting with the master, then the first slave, then the second slave. This will start the Deep Fabric process. 
+
+6. Run the demo2.sh script on the master. This script will first connect each of the machines' fabric processes. It will then create the deep databases within the directory DeepDemo in the current directory that the fabric was launched from. It will setup master slave relationships, and then begin inserting data into the master database. Within a few minutes, you should see printouts on each of the machines indicating that data is being received and indexed.
+
+7. Depending on machine and network performance, the test should complete in around 30 minutes. The master will indicate when it is complete, and print out the total test times. At this point, the processes on each machine can be killed (killall -9 deepis-fabric).
+
+8. If you wish the re run the test, be sure to remove or delete the contents of the DeepDemo directory, and then restart these instructions from step 5.
