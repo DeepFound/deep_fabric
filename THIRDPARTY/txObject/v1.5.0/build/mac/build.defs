@@ -1,0 +1,23 @@
+###############################################################################
+##
+##   Copyright (c) 1995-2010, Thomas M. Hazel, txObject ATK (www.txobject.org)
+##
+##   All Rights Reserved. See LICENSE.txt for license definition
+##
+###############################################################################
+
+CC=gcc
+
+CCC=g++
+
+CFLAGS=-O2 -DTX_MAC -DTX_SMART_BUFFER -DTX_NON_PREEMPT_SUPPORT -DTX_JUMP_SUPPORT
+
+ARCHIVE=ar -rv
+
+RANLIB=ranlib
+
+OS_TEMPORARY=a.out.dSYM
+
+SYS_LIBS=
+
+PLATFORM=linux

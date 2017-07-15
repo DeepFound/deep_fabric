@@ -1,0 +1,138 @@
+<?xml version="1.0"?>
+<project>
+	<modelVersion>4.0.0</modelVersion>
+	<groupId>com.deepis</groupId>
+	<artifactId>deepis-libzmq</artifactId>
+	<name>${project.artifactId}</name>
+	<packaging>pom</packaging>
+	<version>1.0.0</version>
+
+        <!-- pulls in test and common properties / dependencies -->
+        <parent>
+          <groupId>com.deepis</groupId>
+          <artifactId>deepis-maven</artifactId>
+          <version>1.0.0</version>
+        </parent>	
+
+	<properties>
+	  <maven.antrun.version>1.6</maven.antrun.version>
+	  <build.dir>${basedir}/build</build.dir>
+	  <cmake.build.dir>${basedir}/build</cmake.build.dir>
+	</properties>
+
+	<build>
+          <plugins>
+            <plugin>
+              <groupId>org.apache.maven.plugins</groupId>
+              <artifactId>maven-antrun-plugin</artifactId>
+              <version>${maven.antrun.version}</version>
+
+              <dependencies>
+		<dependency>
+		  <groupId>com.deepis</groupId>
+		  <artifactId>deepis-ant-dependencies</artifactId>
+		  <version>${project.version}</version>
+		  <type>pom</type>
+		</dependency>
+              </dependencies>
+
+              <executions>
+                <execution>
+                  <id>${project.name}-clean</id>
+                  <phase>clean</phase>
+                  <configuration>
+                    <target>
+		      <exec dir="${basedir}" executable="make" failonerror="false">
+			<arg value="distclean"/>
+		      </exec>
+		      <delete includeemptydirs="true" failonerror="false" verbose="true">
+			<fileset dir="${build.dir}"/>
+		      </delete>
+		      <delete includeemptydirs="true" failonerror="false" verbose="true">
+			<fileset dir="${build.dir}/target"/>
+		      </delete>
+		      <delete includeemptydirs="true" failonerror="false" verbose="true">
+			<fileset dir="${basedir}/config"/>
+		      </delete>
+		      <delete file="${basedir}/config.status" failonerror="false" verbose="true"/>
+		      <delete file="${basedir}/config.log" failonerror="false" verbose="true"/>
+		      <delete file="${basedir}/configure" failonerror="false" verbose="true"/>
+		      <delete file="${basedir}/Makefile" failonerror="false" verbose="true"/>
+
+                    </target>
+                  </configuration>
+                  <goals>
+                    <goal>run</goal>
+                  </goals>
+                </execution>
+
+		<execution>
+		  <id>${project.name}-initialize</id>
+		  <phase>initialize</phase>
+		  <configuration>
+		    <target>
+		      <mkdir dir="${build.dir}"/>
+		    </target>
+		  </configuration>
+		  <goals>
+		    <goal>run</goal>
+		  </goals>
+		</execution>
+
+		<execution>
+		  <id>${artifactId}-generate-resources</id>
+		  <phase>generate-resources</phase>
+		  <configuration>
+		    <target>
+		      <exec dir="${cmake.build.dir}" executable="cmake" failonerror="true">
+			<arg value="${basedir}"/>
+		      </exec>
+		      <exec dir="${basedir}" executable="${basedir}/autogen.sh" failonerror="true"/>
+		      <exec dir="${basedir}" executable="${basedir}/configure" failonerror="true">
+			<arg value="--with-libsodium=no"/>
+			<arg value="--prefix=${build.dir}/target"/>
+		      </exec>
+		    </target>
+		  </configuration>
+		  <goals>
+		    <goal>run</goal>
+		  </goals>
+		</execution>
+
+		<execution>
+		  <id>${project.name}-compile</id>
+		  <phase>compile</phase>
+		  <configuration>
+		    <target unless="windows.build">
+		      <exec dir="${basedir}" executable="make" failonerror="true">
+			<!-- <arg value="check"/> -->
+		      </exec>
+		    </target>
+		  </configuration>
+		  <goals>
+		    <goal>run</goal>
+		  </goals>
+		</execution>
+
+		<execution>
+		  <id>${project.name}-install</id>
+		  <phase>install</phase>
+		  <configuration>
+		    <target>
+		      <exec dir="${basedir}" executable="make" failonerror="true">
+			<arg value="install"/>
+		      </exec>
+		    </target>
+		  </configuration>
+		  <goals>
+		    <goal>run</goal>
+		  </goals>
+		</execution>
+
+              </executions>
+
+            </plugin>
+          </plugins>
+	</build>
+	
+</project>
