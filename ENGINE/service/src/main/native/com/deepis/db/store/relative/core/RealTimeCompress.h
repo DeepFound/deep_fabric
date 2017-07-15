@@ -100,6 +100,7 @@ class RealTimeCompress {
 				SegMapEntry* infoEntry = infoIter->MapInformationEntrySetIterator::next();
 				Information* info = infoEntry->getValue();
 
+				// DATABASE-859 / DATABASE-864
 				#ifdef DEEP_DEBUG
 				StoryLine& storyLine = infoEntry->getStoryLine();
 				if (((info->getData() == null) && (useValue == true)) || (info->getLevel() != Information::LEVEL_COMMIT)) {

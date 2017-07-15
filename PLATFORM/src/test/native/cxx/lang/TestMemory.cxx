@@ -27,8 +27,10 @@
  */
 #include "cxx/lang/nbyte.h"
 #include "cxx/lang/Memory.h"
-
 #include "cxx/util/Logger.h"
+#include "cxx/util/PrettyPrint.h"
+#include "cxx/lang/types.h"
+#include "cxx/lang/String.h"
 
 using namespace cxx::lang;
 using namespace cxx::util;
@@ -42,16 +44,27 @@ nbyte* allocateMB(int mb) {
 
 void printStats() {
 	ulongtype application = Memory::getApplicationAllocatedBytes();
-	ulongtype process = Memory::getProcessAllocatedBytes();
-	ulongtype available = Memory::getAvailableBytes();
+	ulongtype process     = Memory::getProcessAllocatedBytes();
+	ulongtype available   = Memory::getAvailableBytes();
 	ulongtype totalMemory = Memory::getAvailableResources();
 	ulongtype rssMemory   = Memory::getRSS();
 
-	DEEP_LOG(INFO, OTHER, "MEMORY (application): %llu MB\n", (application/1024)/1024);
-	DEEP_LOG(INFO, OTHER, "MEMORY (process):     %llu MB\n", (process/1024)/1024);
-	DEEP_LOG(INFO, OTHER, "MEMORY (available):   %llu MB\n", (available/1024)/1024);
-	DEEP_LOG(INFO, OTHER, "MEMORY (total):       %llu MB\n", (totalMemory/1024)/1024);
-	DEEP_LOG(INFO, OTHER, "MEMORY (rss):         %llu bytes\n", rssMemory);
+	cxx::lang::String cPretty;
+
+	prettyprint::Bytes<ulongtype>(application, cPretty);
+	DEEP_LOG(INFO, OTHER, "MEMORY (application): %s\n", cPretty.c_str());
+
+	prettyprint::Bytes<ulongtype>(process, cPretty);
+	DEEP_LOG(INFO, OTHER, "MEMORY (process):     %s\n", cPretty.c_str());
+
+	prettyprint::Bytes<ulongtype>(available, cPretty);
+	DEEP_LOG(INFO, OTHER, "MEMORY (available):   %s\n", cPretty.c_str());
+
+	prettyprint::Bytes<ulongtype>(totalMemory, cPretty);
+	DEEP_LOG(INFO, OTHER, "MEMORY (total):       %s\n", cPretty.c_str());
+
+	prettyprint::Bytes<ulongtype>(rssMemory, cPretty);
+	DEEP_LOG(INFO, OTHER, "MEMORY (rss):         %s\n", cPretty.c_str());
 
 	DEEP_LOG(INFO, OTHER, "\n");
 }

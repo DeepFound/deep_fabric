@@ -23,12 +23,17 @@ include_directories(${DEEPIS_STANDARD_INCS} ${DEEPIS_PLATFORM_INC} ${DEEPIS_DB_C
 # Source Files
 #
 set (DEEPIS_DB_SERVICE_SRC
-  src/main/native/com/deepis/db/store/relative/core/RealTimeProtocol_v1_0.cxx
   src/main/native/com/deepis/db/store/relative/core/RealTimeMap.cxx
+  src/main/native/com/deepis/db/store/relative/core/RealTimeProtocol_v1_0.cxx
   src/main/native/com/deepis/db/store/relative/core/Properties.cxx
   src/main/native/com/deepis/db/store/relative/util/Versions.cxx
   src/main/native/com/deepis/db/store/relative/util/MapFileUtil.cxx
-  src/main/native/com/deepis/db/store/relative/util/BufferedRandomAccessFile.cxx)
+  src/main/native/com/deepis/db/store/relative/util/BufferedRandomAccessFile.cxx
+  src/main/native/com/deepis/db/store/relative/distributed/VirtualKeySpace.cxx
+  src/main/native/com/deepis/db/store/relative/distributed/SegmentDataManager.cxx
+  src/main/native/com/deepis/db/store/relative/distributed/DataLogManager.cxx
+  src/main/native/com/deepis/db/store/relative/distributed/MapFacilitator.cxx
+  src/main/native/com/deepis/db/store/relative/distributed/ObjectMessageService.cxx)
 
 #
 # Create library
@@ -56,7 +61,10 @@ file(APPEND ${DB_SERVICE_CONFIG_FILE} "include(${DB_SERVICE_EXPORTS_FILE})\n")
 #
 # Test
 #
-add_deep_test(IntUnitTest src/test/native/com/deepis/db/store/relative/core/TestUnitInt.cxx ${DEEPIS_TEST_LIBS})
+add_deep_test(SerializationUnitTest src/test/native/com/deepis/db/store/relative/distributed/TestSerialization.cxx ${DEEPIS_TEST_LIBS})
+add_deep_test(LazySlaveUnitTest src/test/native/com/deepis/db/store/relative/distributed/TestLazySlave.cxx ${DEEPIS_TEST_LIBS})
+add_deep_test(HASyncSlaveUnitTest src/test/native/com/deepis/db/store/relative/distributed/TestHASyncSlave.cxx ${DEEPIS_TEST_LIBS})
+
 add_deep_test(FileRangeTest src/test/native/com/deepis/db/store/relative/core/TestFileRange.cxx ${DEEPIS_TEST_LIBS})
 add_deep_test(StringUnitTest src/test/native/com/deepis/db/store/relative/core/TestUnitString.cxx ${DEEPIS_TEST_LIBS})
 add_deep_test(SecondaryUnitTest src/test/native/com/deepis/db/store/relative/core/TestUnitSecondary.cxx ${DEEPIS_TEST_LIBS})
@@ -65,6 +73,7 @@ add_deep_test(NextPrevTest src/test/native/com/deepis/db/store/relative/core/Tes
 add_deep_test(PerfTest src/test/native/com/deepis/db/store/relative/core/TestPerf.cxx ${DEEPIS_TEST_LIBS})
 add_deep_test(RandomTest src/test/native/com/deepis/db/store/relative/core/TestRandom.cxx ${DEEPIS_TEST_LIBS})
 add_deep_test(UpdateTest src/test/native/com/deepis/db/store/relative/core/TestUpdate.cxx ${DEEPIS_TEST_LIBS})
+add_deep_test(IntTest src/test/native/com/deepis/db/store/relative/core/TestUnitInt.cxx ${DEEPIS_TEST_LIBS})
 add_deep_test(DeleteTest src/test/native/com/deepis/db/store/relative/core/TestDelete.cxx ${DEEPIS_TEST_LIBS})
 add_deep_test(MultiThreadTest src/test/native/com/deepis/db/store/relative/core/TestMultiThread.cxx ${DEEPIS_TEST_LIBS})
 add_deep_test(SecondaryDynamicTest src/test/native/com/deepis/db/store/relative/core/TestDynamicSecondary.cxx ${DEEPIS_TEST_LIBS})
@@ -74,6 +83,7 @@ add_deep_test(BufferedRandomAccessFileTest src/test/native/com/deepis/db/store/r
 
 #add_deep_test(FileTest src/test/native/com/deepis/db/store/relative/util/TestMeasuredRandomAccessFile.cxx ${DEEPIS_TEST_LIBS})
 #add_deep_test(IsolationTest src/test/native/com/deepis/db/store/relative/core/TestIsolation.cxx ${DEEPIS_TEST_LIBS})
+# DATABASE-673 Transaction test needs to be re-written using TestClient ${DEEPIS_TEST_LIBS})
 #add_deep_test(TransactionTest src/test/native/com/deepis/db/store/relative/core/TestTransaction.cxx ${DEEPIS_TEST_LIBS})
 #add_deep_test(ConcurrentTest src/test/native/com/deepis/db/store/relative/core/TestConcurrent.cxx ${DEEPIS_TEST_LIBS})
 #add_deep_test(MemoryGrowthTest src/test/native/com/deepis/db/store/relative/core/TestMemoryGrowth.cxx ${DEEPIS_TEST_LIBS})

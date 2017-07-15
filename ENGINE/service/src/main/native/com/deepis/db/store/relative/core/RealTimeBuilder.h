@@ -189,7 +189,7 @@ class KeyBuilder<nbyte*> : public RealTimeBuilder {
 		}
 
 		FORCE_INLINE void copyKey(nbyte* in, nbyte** out) const {
-			/* TODO: cannot assume caller knows length
+			/* DATABASE-739: fix this for Berkeley API, cannot assume caller knows length
 			if ((*out)->length != in->length) {
 				(*out)->realloc(in->length);
 			}

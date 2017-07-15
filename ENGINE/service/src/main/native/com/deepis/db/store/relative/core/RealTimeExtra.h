@@ -52,7 +52,13 @@ struct ExtraStatistics {
 		boolean m_totalChange;
 		AtomicLong m_totalSize;
 		AtomicLong m_userSpaceSize;
+
+		#if 0 //DATABASE-1672
+		// file index -> compression qualified
+		HashMap<ushorttype,boolean> m_compressionQualified;
+		#else
 		boolean m_compressionQualified;
+		#endif
 
 		// file index -> compression percentage
 		HashMap<ushorttype,bytetype> m_compressionPercentage;
@@ -70,7 +76,11 @@ struct ExtraStatistics {
 	public:
 		ExtraStatistics(void):
 			m_totalChange(false),
+			#if 0 //DATABASE-1672
+			m_compressionQualified(INITIAL_CAPACITY, false),
+			#else
 			m_compressionQualified(true),
+			#endif
 
 			m_compressionPercentage(INITIAL_CAPACITY, false),
 
@@ -116,13 +126,26 @@ struct ExtraStatistics {
 		}
 
 		FORCE_INLINE boolean getCompressionQualified(ushorttype index) const {
+			#if 0 //DATABASE-1672
+			if (m_compressionQualified.containsKey(index) == true) {
+				return m_compressionQualified.get(index);
+
+			} else {
+				return true;
+			}
+			#else
 			return m_compressionQualified;
+			#endif
 		}
 
 		FORCE_INLINE void setCompressionQualified(ushorttype index, boolean qualified) {
+			#if 0 //DATABASE-1672
+			m_compressionQualified.put(index, qualified);
+			#else
 			if (m_compressionQualified == true) {
 				m_compressionQualified = qualified;
 			}
+			#endif
 		}
 
 		FORCE_INLINE bytetype getCompressionPercentage(ushorttype index) const {

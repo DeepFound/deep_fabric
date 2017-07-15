@@ -58,6 +58,27 @@ struct SegMapEntryCmp {
 };
 
 template<typename K>
+class ConductorEntry : public MapEntry<K,Information*,bytetype> {
+
+	private:
+		Segment<K>* m_segment;
+
+	public:
+		ConductorEntry(K key, Information* info, bytetype ctxt, Segment<K>* segment):
+			MapEntry<K,Information*,bytetype>(key, info, ctxt),
+			m_segment(segment) {
+		}
+
+		void setSegment(Segment<K>* segment) {
+			m_segment = segment;
+		}
+
+		Segment<K>* getSegment() const {
+			return m_segment;
+		}
+};
+
+template<typename K>
 class RealTimeConductor : public Conductor {
 
 	typedef typename RealTimeTypes<K>::SegTreeMap SegTreeMap;
@@ -69,7 +90,7 @@ class RealTimeConductor : public Conductor {
 			boolean persisted;
 		};
 
-		BasicArray<SegMapEntry*> m_operations;
+		BasicArray<ConductorEntry<K>*> m_operations;
 		RealTimeMap<K>* m_primaryMap;
 		BasicArray<Marker*> m_markers;
 		inttype m_size;
@@ -150,21 +171,21 @@ class RealTimeConductor : public Conductor {
 			m_markers.clear();
 		}
 
-		FORCE_INLINE SegMapEntry* get(inttype index) const {
+		FORCE_INLINE ConductorEntry<K>* get(inttype index) const {
 			return m_operations.get(index);
 		}
 
 		#ifdef DEEP_DEBUG
-		FORCE_INLINE void add(StoryLock* slock, K key, Information* info, Transaction* tx = null) {
+		FORCE_INLINE void add(StoryLock* slock, K key, Information* info, Segment<K>* segment, Transaction* tx = null) {
 			if ((tx != null) && (slock->getIdentifier() != tx->getIdentifier())) {
 				DEEP_LOG(ERROR, OTHER, "Invalid conductor add: %d, %d\n", slock->getIdentifier(), tx->getIdentifier());
 
 				throw InvalidException("Invalid conductor add");
 			}
 		#else
-		FORCE_INLINE void add(StoryLock* slock, K key, Information* info) {
+		FORCE_INLINE void add(StoryLock* slock, K key, Information* info, Segment<K>* segment) {
 		#endif
-			SegMapEntry* infoEntry = null;
+			ConductorEntry<K>* infoEntry = null;
 			if (m_size < m_operations.size()) {
 				infoEntry = m_operations.get(m_size++);
 
@@ -173,7 +194,7 @@ class RealTimeConductor : public Conductor {
 			}
 
 			if (infoEntry == null) {
-				infoEntry = new SegMapEntry(key, info, -1 /* ctx */);
+				infoEntry = new ConductorEntry<K>(key, info, -1 /* ctx */, segment);
 				m_operations.add(infoEntry, true);
 			}
 
@@ -198,13 +219,14 @@ class RealTimeConductor : public Conductor {
 			#endif
 
 			#endif
+			infoEntry->setSegment(segment);
 
 			if (m_mergeOptimize != -1) {
 				m_mergeOptimize++;
 			}
 		}
 
-		FORCE_INLINE SegMapEntry* remove(inttype index) {
+		FORCE_INLINE ConductorEntry<K>* remove(inttype index) {
 			m_size--;
 			return m_operations.remove(index);
 		}

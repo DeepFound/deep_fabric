@@ -33,8 +33,8 @@
 #include "cxx/util/Logger.h"
 
 #include "com/deepis/db/store/relative/core/Properties.h"
-#include "com/deepis/db/store/relative/util/MapFileSet.h"
 #include "com/deepis/db/store/relative/util/InvalidException.h"
+#include "com/deepis/db/store/relative/util/MapFileSet.h"
 
 using namespace cxx::util;
 using namespace com::deepis::db::store::relative::util;

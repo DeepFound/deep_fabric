@@ -432,6 +432,7 @@ class Properties {
 		}
 
 		FORCE_INLINE static boolean getDebugEnabled(DebugOption option) {
+			// DATABASE-1905
 			// TODO: Force this on for now but leave as an option. Can be removed completely if we don't see any problems
 			if (option == FILE_REF_CHECKS) {
 				return true;

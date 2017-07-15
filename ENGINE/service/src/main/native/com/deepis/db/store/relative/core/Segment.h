@@ -43,6 +43,12 @@
 #include "com/deepis/db/store/relative/core/RealTimeTypes.h"
 #include "com/deepis/db/store/relative/core/RealTimeLocality.h"
 
+#ifdef DEEP_DISTRIBUTED
+#include "com/deepis/db/store/relative/distributed/VirtualInfo.h"
+#include "com/deepis/db/store/relative/distributed/QuickList.h"
+using namespace com::deepis::db::store::relative::distributed;
+#endif
+
 using namespace cxx::util;
 using namespace cxx::util::concurrent::locks;
 
@@ -91,6 +97,7 @@ class Segment : public RealTimeTypes<K>::SegTreeMap /*, public Lockable */ {
 		ReentrantLock m_lock;
 		#endif
 
+		// DATABASE-103
 		#if 0
 		longtype m_version;
 		#endif
@@ -134,6 +141,12 @@ class Segment : public RealTimeTypes<K>::SegTreeMap /*, public Lockable */ {
 
 		// XXX: locked on indexed / global thread
 		ubytetype m_indexFlags;
+
+		#ifdef DEEP_DISTRIBUTED
+		boolean m_remoteOwner;
+		uinttype m_maxRealViewpoint;
+		QuickList<VirtualInfo*>* m_virtualStoryLine;
+		#endif
 
 		boolean m_rolling;
 		pthread_t m_rollOwner;
@@ -188,6 +201,7 @@ class Segment : public RealTimeTypes<K>::SegTreeMap /*, public Lockable */ {
 			return __sync_sub_and_fetch(&m_refcnt, 1);
 		}
 
+		// DATABASE-103
 		#if 0
 		FORCE_INLINE longtype getVersion(void) const {
 			return m_version;
@@ -259,6 +273,7 @@ class Segment : public RealTimeTypes<K>::SegTreeMap /*, public Lockable */ {
 			#else
 			m_lock(false),
 			#endif
+			// DATABASE-103
 			#if 0
 			m_version(version),
 			#endif
@@ -279,6 +294,11 @@ class Segment : public RealTimeTypes<K>::SegTreeMap /*, public Lockable */ {
 			m_extraFlags(0),
 			m_moreFlags(0),
 			m_indexFlags(0),
+			#ifdef DEEP_DISTRIBUTED
+			m_remoteOwner(false),
+			m_maxRealViewpoint(0),
+			m_virtualStoryLine(null),
+			#endif
 			m_rolling(false),
 			m_rollOwner((pthread_t)null),
 			m_rowOwners() {
@@ -299,6 +319,11 @@ class Segment : public RealTimeTypes<K>::SegTreeMap /*, public Lockable */ {
 			if (m_zipData != null) {
 				free(m_zipData);
 			}
+			#ifdef DEEP_DISTRIBUTED
+			if (m_virtualStoryLine != null) {
+				delete m_virtualStoryLine;
+			}
+			#endif
 		}
 
 		FORCE_INLINE void setStateFlags(ubytetype flags) {
@@ -1133,6 +1158,32 @@ class Segment : public RealTimeTypes<K>::SegTreeMap /*, public Lockable */ {
 			m_lock.unlock();
 		}
 
+		#ifdef DEEP_DISTRIBUTED
+		FORCE_INLINE boolean getRemoteOwner() const {
+			return m_remoteOwner;
+		}
+
+		FORCE_INLINE void setRemoteOwner(boolean remoteOwner) {
+			m_remoteOwner = remoteOwner;
+		}
+
+		FORCE_INLINE uinttype getMaxRealViewpoint() const {
+			return m_maxRealViewpoint;
+		}
+
+		FORCE_INLINE void setMaxRealViewpoint(uinttype maxViewpoint) {
+			m_maxRealViewpoint = maxViewpoint;
+		}
+
+		FORCE_INLINE void initVirtualStoryLine() {
+			m_virtualStoryLine = new QuickList<VirtualInfo*>();
+		}
+
+		FORCE_INLINE QuickList<VirtualInfo*>* getVirtualStoryLine() const {
+			return m_virtualStoryLine;
+		}
+		#endif
+
 		FORCE_INLINE boolean getRolling() const {
 			return m_rolling;
 		}
@@ -1332,7 +1383,7 @@ class __attribute__((packed)) MapEntry<K,Information*,bytetype> {
 
 			const shorttype level = getValue()->getLevel();
 			if (level != Information::LEVEL_COMMIT) {
-				// XXX: debug disabled (move from physical to logical rootedness)
+				// XXX: debug disabled due to DATABASE-2159 changes (move from physical to logical rootedness)
 				#if 0
 				const boolean wasRooted = getValue()->getRooted(indexValue);
 				if ((wasRooted == true) && (getValue()->getLevel() != Information::LEVEL_COMMIT) /* XXX: must check level again */) {

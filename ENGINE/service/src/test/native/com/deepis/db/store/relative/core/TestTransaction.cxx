@@ -15,7 +15,10 @@ static nbyte DATA(DATA_SIZE);
 static nbyte DATA2(DATA_SIZE);
 
 /*
- * XXX: This test needs to be re-written using the TestClient harness.
+ * !!! TODO: see bug DATABASE-673 !!!
+ *
+ * This test needs to be re-written using the TestClient harness.
+ *
  */
 
 int key_0 = 0,
@@ -1716,14 +1719,14 @@ void testBeginRemoveBeginPutBeginUpdateRollback() {
 		exit(1);
 	}
 
-	/* XXX:
+/* XXX: DATABASE-169
 	// NON-TX get (secondary 3 should not be present)
 	result = MAP_SECONDARY->get(key_3, &DATA, RealTimeMap<int>::EXACT, &retkey, null);
 	if (result == true) {
 		DEEP_LOG(ERROR, OTHER, "get succeeded but should have failed, %d is present as secondary key outside of tx\n", retkey);
 		exit(1);
 	}
-	*/
+*/
 
 	tx->rollback(tx->getLevel());
 

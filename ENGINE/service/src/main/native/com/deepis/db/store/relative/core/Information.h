@@ -29,6 +29,7 @@
 #define COM_DEEPIS_DB_STORE_RELATIVE_CORE_INFORMATION_H_ 
 
 #include "cxx/lang/types.h"
+#include "cxx/lang/Thread.h"
 
 #ifdef DEEP_DEBUG
 	#include "cxx/util/Logger.h"
@@ -43,6 +44,7 @@
 #include "com/deepis/db/store/relative/util/ReferenceObject.h"
 
 using namespace cxx::lang;
+using namespace cxx::util::concurrent::locks;
 using namespace com::deepis::db::store::relative::util;
 
 namespace com { namespace deepis { namespace db { namespace store { namespace relative { namespace core {

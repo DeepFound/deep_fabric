@@ -29,12 +29,12 @@
 #include "cxx/lang/Memory.h"
 #include "cxx/lang/Runtime.h"
 #include "cxx/util/Logger.h"
-
-#include <inttypes.h>
+#include "cxx/util/PrettyPrint.h"
+#include "cxx/lang/String.h"
+#include "cxx/lang/types.h"
 
 using namespace cxx::lang;
 using namespace cxx::util;
-
 
 nbyte* allocateMB(int mb) {
         DEEP_LOG(INFO, OTHER, "Allocate %d MB\n", mb);
@@ -49,11 +49,22 @@ void printStats() {
 	ulongtype pageSize    = Runtime::getRuntime()->getPageSize();
 	ulongtype rss         = Runtime::getRuntime()->getRSS();
 
-	DEEP_LOG(INFO, OTHER, "RUNTIME (totalMemory): %llu GiB %llu Bytes\n", (totalMemory/1024/1024/1024), totalMemory);
-	DEEP_LOG(INFO, OTHER, "RUNTIME (freeMemory):  %llu GiB %llu Bytes\n", (freeMemory/1024/1024/1024), freeMemory);
+	cxx::lang::String cPretty;
+	
+	prettyprint::Bytes<ulongtype>(totalMemory, cPretty);
+	DEEP_LOG(INFO, OTHER, "RUNTIME (totalMemory): %s %lluB\n", cPretty.c_str(), totalMemory);
+
+	prettyprint::Bytes<ulongtype>(freeMemory, cPretty);
+	DEEP_LOG(INFO, OTHER, "RUNTIME (freeMemory):  %s %lluB\n", cPretty.c_str(), freeMemory);
+
 	DEEP_LOG(INFO, OTHER, "RUNTIME (availProc):   %llu cores\n", availProc);
-	DEEP_LOG(INFO, OTHER, "RUNTIME (pageSize):    %llu bytes\n", pageSize);
-	DEEP_LOG(INFO, OTHER, "RUNTIME (rss):         %llu bytes\n", rss);
+
+	prettyprint::Bytes<ulongtype>(pageSize, cPretty);
+	DEEP_LOG(INFO, OTHER, "RUNTIME (pageSize):    %s\n", cPretty.c_str());
+
+	prettyprint::Bytes<ulongtype>(rss, cPretty);
+	DEEP_LOG(INFO, OTHER, "RUNTIME (rss):         %s\n", cPretty.c_str());
+
 	DEEP_LOG(INFO, OTHER, "\n");
 }
 

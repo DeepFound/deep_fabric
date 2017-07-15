@@ -677,7 +677,7 @@ class Comparator<MeasuredRandomAccessFile*>  {
 		}
 };
 
-} } // namespace
+} }
 
 #endif
 

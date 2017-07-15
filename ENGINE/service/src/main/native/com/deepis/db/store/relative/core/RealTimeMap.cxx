@@ -72,6 +72,10 @@
 
 // TODO: split RealTimeMap into Index and Map (i.e. RealTimeIndex, RealTimeMap) where Map derives from Index
 
+#ifdef DEEP_DISTRIBUTED
+#include "com/deepis/db/store/relative/distributed/MapFacilitator.h"
+using namespace com::deepis::db::store::relative::distributed;
+#endif
 using namespace com::deepis::db::store::relative::core;
 
 template<typename K>
@@ -159,6 +163,11 @@ RealTimeMap<K>::RealTimeMap(const char* filepath, const longtype options, const 
 	m_failedPurgeCycles(0),
 	m_cycleCacheUsage(RealTimeResource::IGNORE),
 
+	#ifdef DEEP_DISTRIBUTED
+	m_mapFacilitator(null),
+	m_maxViewpoint(0),
+	#endif
+
 	// XXX: used to remove iterator allocation / deallocation (static relationships)
 	m_orderSegmentSet(true),
 	m_purgeSegmentSet(true),
@@ -242,6 +251,13 @@ RealTimeMap<K>::~RealTimeMap(void) {
 	Converter<Iterator<MeasuredRandomAccessFile*>*>::destroy(iter);
 
 	deleteCacheAndFileMemory();
+
+	#ifdef DEEP_DISTRIBUTED
+	if (m_mapFacilitator != null) {
+		// TODO is this owned by the map or should it continue to exist? currently test program owns it and passes it in
+		//delete m_mapFacilitator;
+	}
+	#endif
 
 	if (m_primaryIndex != null) {
 		m_share.setAwaitingDeletion(null, null);
@@ -836,6 +852,7 @@ void RealTimeMap<K>::ejectInformation(Transaction* tx, const bytearray pkey, con
 
 	K delkey = m_keyBuilder->fillKey(pkey, delinfo->getData(), ctxt->getKey1());
 
+	/* DATABASE-1727: could be a summary, thus slow-ish get */
 	Segment<K>* segment = getSegment(ctxt, delkey, false, false /* don't fill, ok to be virtual */);
 	if (segment != null) {
 		CONTEXT_STACK_HANDLER(K,ctxt,segment,global);
@@ -895,6 +912,7 @@ void RealTimeMap<K>::ejectInformation(Transaction* tx, const bytearray pkey, con
 
 				RealTimeVersion<K>::statisticPagingDead(this, segment, delinfo, false /* checkpoint */);
 
+				/* DATABASE-1727: though segment was not filled, it will be if an element is removed */
 				if (info == null) {
 					K firstKey = segment->SegTreeMap::firstKey();
 
@@ -1000,7 +1018,7 @@ XInfoRef* RealTimeMap<K>::primaryInformation(Transaction* tx, const bytearray pk
 
 	K key = m_keyBuilder->fillKey(pkey, ctxt->getKey3());
 	
-	// TODO: investigate performce of flipping this back to false after cold start (ie not opening purged segments at runtime)
+	// TODO: DATABASE-1928-V2 investigate performce of flipping this back to false after cold start (ie not opening purged segments at runtime)
 	boolean openSegment = RealTimeAdaptive_v1<K>::primaryInformationOpenSegment(this);
 	boolean wasClosed = false;
 
@@ -1045,6 +1063,7 @@ XInfoRef* RealTimeMap<K>::primaryInformation(Transaction* tx, const bytearray pk
 	if ((info != null) && (info->getDeleting() == false) && (info->getLevel() == Information::LEVEL_COMMIT) && (info->getData() != null)) {
 
 		if (value != null) {
+			// DATABASE-739: fix this for Berkeley API, value->length may be larger than actual value
 			if (((uinttype) value->length) < info->getSize() /* 24-bit unsigned int */) {
 				value->realloc(info->getSize());
 			}
@@ -1283,6 +1302,7 @@ boolean RealTimeMap<K>::lockInformation(Transaction* tx, const bytearray pkey, X
 				if ((identical == false) && (getShare()->getHasPrimary() == false)) {
 					Information* curinfo = isolateInformation(ctxt, topinfo, true);
 
+					// DATABASE-1135
 					if (duplicateInformation(ctxt, pkey, curinfo, (Information*) newinfo, newkey) == true) {
 						return false;
 					}
@@ -1826,6 +1846,7 @@ boolean RealTimeMap<K>::toggleCheckpointMetrics() {
 			}
 		}
 
+		// XXX: DATABASE-1888
 		const boolean force = getAndResetInternalCheckpointRequest();
 		if (force == true) {
 			DEEP_LOG(DEBUG, CHECK, "Processing internal chekpoint request, %s\n", getFilePath());
@@ -2626,12 +2647,11 @@ void RealTimeMap<K>::mergeCacheMemory(RealTimeConductor<K>* conductor) {
 				continue;
 
 			} else if (preinfo->getLevel() < Information::LEVEL_COMMIT) {
+				// XXX: DATABASE-2057 - keep merge level consistent with current level for abort scenario
 				if ((preinfo->getLevel() == Information::LEVEL_MERGED) && (preinfo->getMergeLevel() == curlevel)) {
 					preinfo->setMergeLevel(prelevel);
 				}
-
 				continue;
-
 			} else {
 				break;
 			}
@@ -2872,16 +2892,24 @@ void RealTimeMap<K>::commitCacheMemory(RealTimeConductor<K>* conductor) {
 	Transaction* tx = conductor->getTransaction();
 
 	const boolean secondaries = m_hasSecondaryMaps;
+
 	longtype commitViewpoint = tx->getViewpoint() + 1;
+	#ifdef DEEP_DISTRIBUTED
+	CommitWorkspace<K> commitWorkspace(m_keyBuilder);	
+	#endif
 
 	ThreadContext<K>* ctxt = (ThreadContext<K>*) conductor->getContext(m_indexValue);
 	CONTEXT_STACK_HANDLE(K,global,ctxt);
 
 	for (int i = conductor->size() - 1; i >= 0; i--) {
-		SegMapEntry* walkEntry = conductor->get(i);
+		ConductorEntry<K>* walkEntry = conductor->get(i);
 		StoryLine& storyLine = walkEntry->getStoryLine();
 
 		Information* endinfo = walkEntry->getValue();
+
+		#if DEEP_DISTRIBUTED
+		Segment<K>* segment = walkEntry->getSegment();
+		#endif
 
 		// XXX: ignore cleared deleted element (see conductor->clear below)
 		if (endinfo == null) {
@@ -2915,6 +2943,24 @@ void RealTimeMap<K>::commitCacheMemory(RealTimeConductor<K>* conductor) {
 
 			// XXX: it is necessary to set the viewpoint prior to setting the level for isolateCheckpoint()
 			commitViewpoint = Transaction::getCurrentViewpoint() + 1;
+			#ifdef DEEP_DISTRIBUTED
+			if (tx->getCommitViewpoint() != 0) {
+				commitViewpoint = tx->getCommitViewpoint();
+
+			} else if ((m_mapFacilitator != null) && (m_mapFacilitator->maintainLiveSummaries() == true)) {
+				boolean log = commitWorkspace.updateSegmentStats(segment, commitViewpoint);
+
+				if (log == true) {
+					commitWorkspace.logVirtualUpdate(key, MapFacilitator<K>::isolateVirtualSize(segment), 
+									MapFacilitator<K>::isolateMinViewpoint(segment), 
+									MapFacilitator<K>::isolateMaxVirtualViewpoint(segment));
+				}
+
+				if (m_mapFacilitator->synchronizeTransactions() == true) {
+					commitWorkspace.logInsert(key, commitViewpoint, endinfo->getSize(), endinfo->getData());
+				}
+			}
+			#endif
 			endinfo->reset(commitViewpoint, 0, true);
 
 			// XXX: note order is important here due to rolling concurrency
@@ -2927,7 +2973,13 @@ void RealTimeMap<K>::commitCacheMemory(RealTimeConductor<K>* conductor) {
 
 		} else if (endinfo->getDeleting() == true) {
 
+			// TODO: make sure segment hasn't changed (via split or merge, may require marking info or segment)
+			#ifdef DEEP_DISTRIBUTED
+			segment->lock();
+			#else
 			Segment<K>* segment = getSegment(ctxt, key, false, false /* don't fill, ok to be virtual */);
+			#endif
+
 			CONTEXT_STACK_ASSIGN(segment,global);
 			{
 				Information* orginfo = endinfo->getNext();
@@ -2947,7 +2999,24 @@ void RealTimeMap<K>::commitCacheMemory(RealTimeConductor<K>* conductor) {
 					// XXX: reset state values for viewpoint and storyline termination
 					if (topinfo->getDeleting() == false) {
 						uinttype viewpoint = topinfo->getViewpoint();
-						topinfo->reset(viewpoint, Transaction::getCurrentViewpoint(), topinfo->getLevel() == Information::LEVEL_COMMIT);
+							
+						commitViewpoint = Transaction::getCurrentViewpoint();
+						#ifdef DEEP_DISTRIBUTED 
+						if (tx->getCommitViewpoint() != 0) {
+							commitViewpoint = tx->getCommitViewpoint() - 1;
+
+						} else if ((m_mapFacilitator != null) && (m_mapFacilitator->maintainLiveSummaries() == true)) {
+							boolean log = commitWorkspace.updateSegmentStats(segment, commitViewpoint);
+
+							if (log == true) {
+								commitWorkspace.logVirtualUpdate(key, MapFacilitator<K>::isolateVirtualSize(segment), 
+												MapFacilitator<K>::isolateMinViewpoint(segment), 
+												MapFacilitator<K>::isolateMaxVirtualViewpoint(segment));
+							}
+						}
+						#endif
+						
+						topinfo->reset(viewpoint, commitViewpoint, topinfo->getLevel() == Information::LEVEL_COMMIT);
 						topinfo->setDeleting(true);
 					}
 
@@ -2967,6 +3036,12 @@ void RealTimeMap<K>::commitCacheMemory(RealTimeConductor<K>* conductor) {
 					if (secondaries == true) {
 						absolveSecondary(tx, key, preinfo);
 					}
+
+					#ifdef DEEP_DISTRIBUTED
+					if ((m_mapFacilitator != null) && (m_mapFacilitator->logChanges() == true)) {
+						commitWorkspace.logDelete(key, Transaction::getCurrentViewpoint(), topinfo->getSize(), topinfo->getData());
+					}
+					#endif
 				}
 
 				storyLine.release();
@@ -2979,7 +3054,13 @@ void RealTimeMap<K>::commitCacheMemory(RealTimeConductor<K>* conductor) {
 
 		} else /* if (endinfo->getUpdating() == true) */ {
 
+			// TODO: make sure segment hasn't changed (via split or merge, may require marking info or segment)
+			#ifdef DEEP_DISTRIBUTED
+			segment->lock();
+			#else
 			Segment<K>* segment = getSegment(ctxt, key, false, false /* don't fill, ok to be virtual */);
+			#endif
+
 			CONTEXT_STACK_ASSIGN(segment,global);
 			{
 				Information* orginfo = endinfo->getNext();
@@ -2988,6 +3069,12 @@ void RealTimeMap<K>::commitCacheMemory(RealTimeConductor<K>* conductor) {
 				if (orginfo == null) {
 					orginfo = endinfo;
 				}
+
+				/* DATABASE-1792: not needed due to above segment lock
+				if (memoryAnalytics == true) {
+					orginfo->lock();
+				}
+				*/
 
 				Information* topinfo = orginfo;
 				if (topinfo != endinfo) {
@@ -3023,6 +3110,20 @@ void RealTimeMap<K>::commitCacheMemory(RealTimeConductor<K>* conductor) {
 
 				// XXX: it is necessary to set the viewpoint prior to setting the level for isolateCheckpoint()
 				commitViewpoint = Transaction::getCurrentViewpoint() + 1;
+				#ifdef DEEP_DISTRIBUTED
+				if (tx->getCommitViewpoint() != 0) {
+					commitViewpoint = tx->getCommitViewpoint();
+
+				} else if ((m_mapFacilitator != null) && (m_mapFacilitator->maintainLiveSummaries() == true)) {
+					boolean log = commitWorkspace.updateSegmentStats(segment, commitViewpoint);
+
+					if (log == true) {
+						commitWorkspace.logVirtualUpdate(key, MapFacilitator<K>::isolateVirtualSize(segment), 
+										MapFacilitator<K>::isolateMinViewpoint(segment), 
+										MapFacilitator<K>::isolateMaxVirtualViewpoint(segment));
+					}
+				}
+				#endif
 				endinfo->reset(commitViewpoint, 0, true);
 
 				endinfo->setLevel(Information::LEVEL_COMMIT);
@@ -3030,12 +3131,47 @@ void RealTimeMap<K>::commitCacheMemory(RealTimeConductor<K>* conductor) {
 				endinfo->setCreating(false);
 				endinfo->setUpdating(false);
 
+				#ifdef DEEP_DISTRIBUTED
+				// don't do this for creating infos
+				if ((m_mapFacilitator != null) && (m_mapFacilitator->logChanges() == true) && (endinfo->getUpdating() == true)) {
+					commitWorkspace.logUpdate(key, endinfo->getViewpoint(), endinfo->getSize(), endinfo->getData());
+				}
+				#endif
+
 				storyLine.setStoryDepth(storyLine.getStoryDepth() + 1);
 				storyLine.release();
+
+
+				/* DATABASE-1792: not needed due to above segment lock
+				if (memoryAnalytics == true) {
+					orginfo->unlock();
+				}
+				*/
 			}
 			CONTEXT_STACK_RELEASE(global);
 		}
 	}
+
+	#ifdef DEEP_DISTRIBUTED
+	while ((m_mapFacilitator != null) && (m_mapFacilitator->subscriberSyncHold() == true)) {
+		Thread::sleep(10);
+	}
+
+	if ((m_mapFacilitator != null) && (m_mapFacilitator->logChanges() == true)) {
+		m_mapFacilitator->commitLog(&commitWorkspace);	
+	}
+
+	if (tx->getCommitViewpoint() != 0) {
+		if (tx->getCommitViewpoint() > getMaxViewpoint()) {
+			setMaxViewpoint(tx->getCommitViewpoint());
+		}
+
+	} else {
+		if (commitViewpoint > getMaxViewpoint()) {
+			setMaxViewpoint(commitViewpoint);
+		}
+	}
+	#endif
 
 	m_entrySize.addAndGet(conductor->m_createStats - conductor->m_deleteStats);
 	m_extraStats.addUserSpaceSize(conductor->m_userSpaceSize);
@@ -3614,6 +3750,15 @@ template<typename K>
 boolean RealTimeMap<K>::needsIndexing(Segment<K>* segment, const uinttype viewpoint, const boolean final, boolean reorg, boolean* summarize, boolean* backwardCheckpoint) {
 	const boolean checkpoint = viewpoint != Locality::VIEWPOINT_NONE;
 
+	// TODO allow this for memory cleanup (delete unviewed) but need special rules for remote owned (no splitting, merging, etc)
+	#if 0
+	#ifdef DEEP_DISTRIBUTED
+	if (segment->getRemoteOwner() == true) {
+		return false;
+	}
+	#endif
+	#endif
+
 	(*backwardCheckpoint) = ((Properties::getCheckpointMode() != Properties::CHECKPOINT_OFF) && (checkpoint == true) && (segment->getSummary() == false) && (getLocalityCmp()->compare(m_endwiseLrtLocality, segment->getIndexLocality()) < 0));
 
 	const boolean forcing = segment->getBeenAltered() || segment->getBeenReseeded() || segment->getBeenRelocated() || (*backwardCheckpoint);
@@ -3751,6 +3896,7 @@ inttype RealTimeMap<K>::indexCacheManagement(boolean* cont, boolean* reorg) {
 	inttype purge = 0;
 	inttype indexRequest = 0;
 	inttype indexAchieved = 0;
+	// DATABASE-2172
 	ulongtype indexPotential = 0;
 
 	// XXX: no pending indexing, collect more segments to index
@@ -3770,10 +3916,13 @@ inttype RealTimeMap<K>::indexCacheManagement(boolean* cont, boolean* reorg) {
 				segment->setIndexOrderKey(m_keyBuilder->cloneKey(segEntry->getKey()));
 				m_orderSegmentList.add(segment, false /* lock */);
 
-				boolean summarize = true;
-				boolean backwardCheckpoint = false;
-				if (needsIndexing(segment, Locality::VIEWPOINT_NONE, false /* final */, *reorg, &summarize, &backwardCheckpoint) == true) {
-					++indexPotential;
+				// DATABASE-2172
+				{
+					boolean summarize = true;
+					boolean backwardCheckpoint = false;
+					if (needsIndexing(segment, Locality::VIEWPOINT_NONE, false /* final */, *reorg, &summarize, &backwardCheckpoint) == true) {
+						++indexPotential;
+					}
 				}
 			}
 		}
@@ -4252,6 +4401,7 @@ boolean RealTimeMap<K>::reorganizeFiles(ThreadContext<K>* ctxt, boolean* cont, b
 		if (wfile == null) {
 			continue;
 
+		// XXX: DATABASE-1545 (deferred deletion)
 		} else if (wfile->getAwaitingDeletion() == true) {
 			continue;
 
@@ -4425,11 +4575,13 @@ boolean RealTimeMap<K>::reorganizeFiles(ThreadContext<K>* ctxt, boolean* cont, b
 				continue;
 			}
 
+			// XXX: DATABASE-1545 (deferred deletion)
 			if (wfile->getAwaitingDeletion() == true) {
 				DEEP_LOG(DEBUG, FSMGT, "block: %s - deferred\n", wfile->getPath());
 				continue;
 			}
 
+			// XXX: DATABASE-2108 (this is an error if this happens)
 			if (wfile->getActive() == true) {
 				DEEP_LOG(WARN, FSMGT, "block: %s - still active %d\n", wfile->getPath(), wfile->syncPrepared());
 				continue;
@@ -4749,10 +4901,23 @@ void RealTimeMap<K>::fillSegment(ThreadContext<K>* ctxt, Segment<K>* segment, bo
 			{
 				if (firstSegment == segment) {
 					m_branchSegmentTreeMap.TreeMap<K,Segment<K>*>::remove(initFirstKey);
+					#ifdef DEEP_DISTRIBUTED
+					if ((m_mapFacilitator != null) && (m_mapFacilitator->maintainLiveSummaries() == true)) {
+						m_mapFacilitator->removeVirtualFirstKey(initFirstKey);
+					} else {
+						Converter<K>::destroy(initFirstKey);
+					}
+					#else
 					Converter<K>::destroy(initFirstKey);
+					#endif
 				}
 
 				m_branchSegmentTreeMap.TreeMap<K,Segment<K>*>::put(segment->SegTreeMap::firstKey(), segment);
+				#ifdef DEEP_DISTRIBUTED
+				if ((m_mapFacilitator != null) && (m_mapFacilitator->maintainLiveSummaries() == true)) {
+					m_mapFacilitator->addVirtualFirstKey(m_keyBuilder->cloneKey(segment->SegTreeMap::firstKey()), MapFacilitator<K>::isolateVirtualSize(segment), MapFacilitator<K>::isolateMinViewpoint(segment), MapFacilitator<K>::isolateMaxVirtualViewpoint(segment));
+				}
+				#endif
 			}
 			m_threadContext.writeUnlock();
 
@@ -5023,6 +5188,17 @@ boolean RealTimeMap<K>::indexSegment(ThreadContext<K>* ctxt, Segment<K>* segment
 			ctxt->m_statsCount1++; // XXX: VERTICAL FRAGMENT
 			#endif
 
+			#ifdef DEEP_DISTRIBUTED
+			if (segment->getSummary() == false) {
+				if ((m_mapFacilitator != null) && (m_mapFacilitator->maintainLiveSummaries() == true)) {
+					if (VirtualKeySpace<K>::versionKeySpace(segment, 0, segment->vsize(), MapFacilitator<K>::isolateMinViewpoint(segment), MapFacilitator<K>::isolateMaxVirtualViewpoint(segment)) == true) {
+						m_mapFacilitator->updateVirtualKey(m_keyBuilder->cloneKey(segment->firstKey()), segment->vsize(), MapFacilitator<K>::isolateMinViewpoint(segment), MapFacilitator<K>::isolateMaxVirtualViewpoint(segment));
+					}
+				}
+			}
+			#endif
+
+
 			// XXX: this might change with dynamic summarization
 			if (segment->getSummary() == false) {
 				segment->incrementFragmentCount();
@@ -5095,7 +5271,11 @@ Segment<K>* RealTimeMap<K>::pageSegment(ThreadContext<K>* ctxt, Segment<K>* segm
 	if (nSegment != null) {
 
 		boolean merge = RealTimeAdaptive_v1<K>::mergeFragmentation(this, segment, nSegment);
+		#ifdef DEEP_DISTRIBUTED
+		if ((merge == true) && (segment->getRemoteOwner() == false) && (nSegment->getRemoteOwner() == false)) {
+		#else
 		if (merge == true) {
+		#endif
 
 			#if 0 /* Properties::getMemoryStreaming() */
 			if (segment->getVirtual() == true) {
@@ -5130,8 +5310,11 @@ Segment<K>* RealTimeMap<K>::pageSegment(ThreadContext<K>* ctxt, Segment<K>* segm
 			goto RETRY;
 		}
 
+		// DATABASE-2153: address deadlock scenario w/ rollover; disable block below when compplete
+		#if 1
 		nSegment->unlock();
 		nSegment = null;
+		#endif
 	}
 
 	// XXX: paging is due to dirty state, following will clear this state if indexing completes
@@ -5567,6 +5750,7 @@ Information* RealTimeMap<K>::setupResult(ThreadContext<K>* ctxt, InfoRef& curinf
 	// XXX: reading information with value compression might require a segment context
 	ctxt->setSegment(segment);
 	{
+		// DATABASE-739: fix this for Berkeley API, value->length may be larger than actual value
 		if (((uinttype) value->length) < curinfo->getSize() /* 24-bit unsigned int */) {
 			value->realloc(curinfo->getSize());
 		}
@@ -5615,11 +5799,32 @@ boolean RealTimeMap<K>::trySetupSegment(ThreadContext<K>* ctxt, Segment<K>* segm
 	}
 	*/
 
+	#ifdef DEEP_DISTRIBUTED
+	if ((segment->getRemoteOwner() == true) && (ctxt->getTransaction()->getCheckRemoteOwner() == true)) {
+		if (MapFacilitator<K>::isolateMaxVirtualViewpoint(segment, ctxt->getTransaction()->getVirtualKeySpaceVersion()) > segment->getMaxRealViewpoint()) {
+			segment->incref();
+			segment->unlock();
+			return false;
+		}
+	}
+	#endif
+
 	return true;
 }
 
 template<typename K>
 boolean RealTimeMap<K>::fillSetupSegment(ThreadContext<K>* ctxt, Segment<K>* segment, boolean physical, boolean values) {
+
+	#ifdef DEEP_DISTRIBUTED
+	if ((segment->getRemoteOwner() == true) && (ctxt->getTransaction()->getCheckRemoteOwner() == true)) {
+		m_mapFacilitator->requestDataForSegment(segment, ctxt->getTransaction()->getVirtualKeySpaceVersion());
+
+		segment->setPurged(false);
+		segment->setVirtual(false);
+
+		return true;
+	}
+	#endif
 
 	if (segment->getSummary() == true) {
 
@@ -5706,6 +5911,11 @@ Segment<K>* RealTimeMap<K>::initSegment(ThreadContext<K>* ctxt, const K key) {
 	}
 
 	m_branchSegmentTreeMap.TreeMap<K,Segment<K>*>::put(newkey, segment);
+	#ifdef DEEP_DISTRIBUTED
+	if ((m_mapFacilitator != null) && (m_mapFacilitator->maintainLiveSummaries() == true)) {
+		m_mapFacilitator->addVirtualFirstKey(m_keyBuilder->cloneKey(newkey), MapFacilitator<K>::isolateVirtualSize(segment), MapFacilitator<K>::isolateMinViewpoint(segment), MapFacilitator<K>::isolateMaxVirtualViewpoint(segment));
+	}
+	#endif
 
 	return segment;
 }
@@ -5782,6 +5992,7 @@ Segment<K>* RealTimeMap<K>::getSegment(ThreadContext<K>* ctxt, const K key, bool
 	RETRY:
 
 	// XXX: safe context lock: multiple readers / no writer on the branch tree
+	// DATABASE-1710 
 	#if 1
 	if (m_threadContext.tryReadLock() == false) {
 		if (forceContextLock == true) {
@@ -5801,11 +6012,13 @@ Segment<K>* RealTimeMap<K>::getSegment(ThreadContext<K>* ctxt, const K key, bool
 
 			if (trySetupSegment(ctxt, segment) == true) {
 				m_threadContext.readUnlock();
+
 				return segment;
 			}
 		}
 	}
 	m_threadContext.readUnlock();
+
 
 	if (segment != null) {
 		if ((wasClosed != null) && ((segment->getSummary() == true) || (segment->getPurged() == true))) {
@@ -5831,6 +6044,7 @@ Segment<K>* RealTimeMap<K>::getSegment(ThreadContext<K>* ctxt, const K key, bool
 		}
 
 		// XXX: safe context lock: multiple readers / no writer on the branch tree
+		// DATABASE-1710
 		#if 1
 		if (m_threadContext.tryReadLock() == false) {
 			if (forceContextLock == true) {
@@ -6993,6 +7207,7 @@ boolean RealTimeMap<K>::checkIsolateLock(ThreadContext<K>* ctxt, InfoRef& infoRe
 			if (info->getNext() != null) {
 				info = isolateInformation(ctxt, info, true);
 
+				// DATABASE-1135
 				if (m_primaryIndex != null) {
 
 					// XXX: can't modify actual branch segment's first key state
@@ -7195,6 +7410,12 @@ void RealTimeMap<K>::mergeSegments(Segment<K>* segment, Segment<K>* nSegment) {
 	m_branchSegmentTreeMap.TreeMap<K,Segment<K>*>::remove(nSegment->SegTreeMap::firstKey());
 	#endif
 
+	#ifdef DEEP_DISTRIBUTED
+	if ((m_mapFacilitator != null) && (m_mapFacilitator->maintainLiveSummaries() == true)) {
+		m_mapFacilitator->removeVirtualFirstKey(m_keyBuilder->cloneKey(nSegment->SegTreeMap::firstKey()));
+	}
+	#endif
+
 	if ((segment->getValuesCompressed() == true) || (segment->getBeenRelocated() == true) || (nSegment->getValuesCompressed() == true) || (nSegment->getBeenRelocated() == true)) {
 		// XXX: ensure values are relocated at lease on shutdown
 		segment->setStreamPosition(0);
@@ -7250,6 +7471,7 @@ Segment<K>* RealTimeMap<K>::splitSegment(ThreadContext<K>* ctxt, Segment<K>* seg
 	}
 
 	Segment<K>* pSegment = new Segment<K>(m_comparator, Properties::DEFAULT_SEGMENT_LEAF_ORDER, Versions::GET_PROTOCOL_CURRENT(), m_keyBuilder->getKeyParts());
+
 	pSegment->setMapContext(m_indexValue);
 	if (lock == true) {
 		pSegment->lock();
@@ -7342,6 +7564,12 @@ Segment<K>* RealTimeMap<K>::splitSegment(ThreadContext<K>* ctxt, Segment<K>* seg
 		}
 
 		m_branchSegmentTreeMap.TreeMap<K,Segment<K>*>::put(*firstKey, pSegment);
+
+		#ifdef DEEP_DISTRIBUTED
+		if ((m_mapFacilitator != null) && (m_mapFacilitator->maintainLiveSummaries() == true)) {
+			m_mapFacilitator->addVirtualFirstKey(m_keyBuilder->cloneKey(*firstKey), MapFacilitator<K>::isolateVirtualSize(pSegment), MapFacilitator<K>::isolateMinViewpoint(pSegment), MapFacilitator<K>::isolateMaxVirtualViewpoint(pSegment));
+		}
+		#endif
 	}
 	if (recover == false) m_threadContext.writeUnlock();
 
@@ -7368,6 +7596,12 @@ void RealTimeMap<K>::reserveSegment(Conductor* conductor, ContextHandle<K>& hand
 
 					m_branchSegmentTreeMap.TreeMap<K,Segment<K>*>::put(key, segment);
 
+					#ifdef DEEP_DISTRIBUTED
+					if ((m_mapFacilitator != null) && (m_mapFacilitator->maintainLiveSummaries() == true)) {
+						m_mapFacilitator->addVirtualFirstKey(m_keyBuilder->cloneKey(key), MapFacilitator<K>::isolateVirtualSize(segment), MapFacilitator<K>::isolateMinViewpoint(segment), MapFacilitator<K>::isolateMaxVirtualViewpoint(segment));
+					}
+					#endif
+
 					handle.assign(segment);
 				}
 			}
@@ -7393,6 +7627,12 @@ K RealTimeMap<K>::rekeySegment(Segment<K>* segment, K newKey, boolean destroy, b
 		if (lock == true) m_threadContext.writeLock();
 		{
 			m_branchSegmentTreeMap.TreeMap<K,Segment<K>*>::put(copyKey, segment);
+
+			#ifdef DEEP_DISTRIBUTED
+			if ((m_mapFacilitator != null) && (m_mapFacilitator->maintainLiveSummaries() == true)) {
+				m_mapFacilitator->addVirtualFirstKey(m_keyBuilder->cloneKey(copyKey), MapFacilitator<K>::isolateVirtualSize(segment), MapFacilitator<K>::isolateMinViewpoint(segment), MapFacilitator<K>::isolateMaxVirtualViewpoint(segment));
+			}
+			#endif
 		}
 		if (lock == true) m_threadContext.writeUnlock();
 	}
@@ -7412,12 +7652,26 @@ void RealTimeMap<K>::reseedSegment(Segment<K>* segment, K oldKey, boolean destro
 	{
 		m_branchSegmentTreeMap.TreeMap<K,Segment<K>*>::remove(oldKey);
 		m_branchSegmentTreeMap.TreeMap<K,Segment<K>*>::put(firstKey, segment);
+
+		#ifdef DEEP_DISTRIBUTED
+		if ((m_mapFacilitator != null) && (m_mapFacilitator->maintainLiveSummaries() == true)) {
+			m_mapFacilitator->removeVirtualFirstKey(m_keyBuilder->cloneKey(oldKey));
+			m_mapFacilitator->addVirtualFirstKey(m_keyBuilder->cloneKey(firstKey), MapFacilitator<K>::isolateVirtualSize(segment), MapFacilitator<K>::isolateMinViewpoint(segment), MapFacilitator<K>::isolateMaxVirtualViewpoint(segment));
+		}
+		#endif
 	}
 	if (lock == true) m_threadContext.writeUnlock();
 
+	// TODO when destroy is false?
+	#ifdef DEEP_DISTRIBUTED
+	if ((destroy == true) && ((m_mapFacilitator != null) && (m_mapFacilitator->maintainLiveSummaries() == false))) {
+		Converter<K>::destroy(oldKey);
+	}
+	#else
 	if (destroy == true) {
 		Converter<K>::destroy(oldKey);
 	}
+	#endif
 
 	segment->setBeenReseeded(true);
 }
@@ -7438,14 +7692,27 @@ void RealTimeMap<K>::deleteSegment(Segment<K>* segment, K firstKey, boolean dest
 			#else
 			m_branchSegmentTreeMap.TreeMap<K,Segment<K>*>::remove(firstKey);
 			#endif
+
+			#ifdef DEEP_DISTRIBUTED
+			if ((m_mapFacilitator != null) && (m_mapFacilitator->maintainLiveSummaries() == true)) {
+				m_mapFacilitator->removeVirtualFirstKey(firstKey);
+			}
+			#endif
 		}
 
 		segment->setBeenDeleted(true);
 		segment->setModification(0);
 
+		// TODO when destroy is false?
+		#ifdef DEEP_DISTRIBUTED
+		if ((destroy == true) && ((m_mapFacilitator != null) && (m_mapFacilitator->maintainLiveSummaries() == false))) {
+			Converter<K>::destroy(firstKey);
+		}
+		#else
 		if (destroy == true) {
 			Converter<K>::destroy(firstKey);
 		}
+		#endif
 
 		m_deletedSegmentList.lock();
 		{
@@ -7524,11 +7791,24 @@ typename RealTimeTypes<K>::SegMapEntry* RealTimeMap<K>::updateInformation(Thread
 				{
 					m_branchSegmentTreeMap.TreeMap<K,Segment<K>*>::remove(retkey);
 					m_branchSegmentTreeMap.TreeMap<K,Segment<K>*>::put(firstKey, segment);
+
+					#ifdef DEEP_DISTRIBUTED
+					if ((m_mapFacilitator != null) && (m_mapFacilitator->maintainLiveSummaries() == true)) {
+						m_mapFacilitator->removeVirtualFirstKey(m_keyBuilder->cloneKey(retkey));
+						m_mapFacilitator->addVirtualFirstKey(m_keyBuilder->cloneKey(firstKey), MapFacilitator<K>::isolateVirtualSize(segment), MapFacilitator<K>::isolateMinViewpoint(segment), MapFacilitator<K>::isolateMaxVirtualViewpoint(segment));
+					}
+					#endif
 				}
 				m_threadContext.writeUnlock();
 			}
 
+			#ifdef DEEP_DISTRIBUTED
+			if ((m_mapFacilitator != null) && (m_mapFacilitator->maintainLiveSummaries() == false)) {
+				Converter<K>::destroy(retkey);
+			}
+			#else
 			Converter<K>::destroy(retkey);
+			#endif
 		}
 
 		Converter<Information*>::destroy(oldinfo);
@@ -7599,11 +7879,21 @@ typename RealTimeTypes<K>::SegMapEntry* RealTimeMap<K>::addInformation(ThreadCon
 			{
 				m_branchSegmentTreeMap.TreeMap<K,Segment<K>*>::put(key, segment);
 
+				#ifdef DEEP_DISTRIBUTED
+				if ((m_mapFacilitator != null) && (m_mapFacilitator->maintainLiveSummaries() == true)) {
+					m_mapFacilitator->addVirtualFirstKey(m_keyBuilder->cloneKey(key), MapFacilitator<K>::isolateVirtualSize(segment), MapFacilitator<K>::isolateMinViewpoint(segment), MapFacilitator<K>::isolateMaxVirtualViewpoint(segment));
+				}
+				#endif
+
 				handle.assign(segment);
 			}
 			m_threadContext.writeUnlock();
 
+		#ifdef DEEP_DISTRIBUTED
+		} else if ((segment->getRemoteOwner() == false) && (segment->SegTreeMap::containsKey(key) == false) && (segment->waitForReferences() == true)) {
+		#else
 		} else if ((segment->SegTreeMap::containsKey(key) == false) && (segment->waitForReferences() == true)) {
+		#endif
 
 			K firstKey = (K) Converter<K>::NULL_VALUE;
 			Segment<K>* pSegment = splitSegment(ctxt, segment, &firstKey /* of pSegment */, true /* lock */);
@@ -7833,6 +8123,7 @@ void RealTimeMap<K>::stitchInformation(ThreadContext<K>* ctxt, Transaction* tx, 
 	}
 }
 
+// DATABASE-1135
 template<typename K>
 boolean RealTimeMap<K>::isolateInformation(ThreadContext<K>* ctxt, Information*& info, const K dupkey) {
 
@@ -7927,6 +8218,7 @@ boolean RealTimeMap<K>::restitchInformation(ThreadContext<K>* ctxt, const Inform
 	return true;
 }
 
+// DATABASE-1135
 template<typename K>
 boolean RealTimeMap<K>::duplicateInformation(ThreadContext<K>* ctxt, const bytearray pkey, Information* curinfo, Information* newinfo, const K dupkey) {
 
@@ -7995,6 +8287,7 @@ boolean RealTimeMap<K>::duplicateInformation(ThreadContext<K>* ctxt, const bytea
 	return false;
 }
 
+// DATABASE-1459
 template<typename K>
 boolean RealTimeMap<K>::duplicateInformation(ThreadContext<K>* ctxt, const bytearray pkey, const Information* newinfo, LockOption lock, K newkey, boolean* identical) {
 
@@ -8050,6 +8343,7 @@ boolean RealTimeMap<K>::duplicateInformation(ThreadContext<K>* ctxt, const bytea
 
 		MIRROR:
 		if (infoEntry != null) {
+			/* DATABASE-1703: this lock is causing a lot contention... see bug description */
 			#if 1
 			ErrorCode code = ERR_SUCCESS;
 			InfoRef infoRef(m_indexValue, segment, (SegMapEntry*)infoEntry);
@@ -8068,6 +8362,7 @@ boolean RealTimeMap<K>::duplicateInformation(ThreadContext<K>* ctxt, const bytea
 			if (topinfo->getDeleting() == false) {
 				Information* curinfo = isolateInformation(ctxt, topinfo, true);
 
+				// DATABASE-1135
 				if (duplicateInformation(ctxt, pkey, curinfo, (Information*) newinfo, newkey /* ignoring primary */) == true) {
 
 					#ifdef DEEP_COMPRESS_PRIMARY_READ
@@ -8257,6 +8552,7 @@ Information* RealTimeMap<K>::isolateCheckpoint(ThreadContext<K>* ctxt, Informati
 
 	if ((m_primaryIndex != null) && (curinfo != null) && (curinfo != topinfo)) {
 
+		// DATABASE-739: fix this for Berkeley API, cannot assume pkey is derived
 		bytearray pkey = null;
 		if (m_keyBuilder->hasHiddenKey() == true) {
 			pkey = m_keyBuilder->getHiddenKey(key);
@@ -8311,6 +8607,7 @@ Information* RealTimeMap<K>::isolateInterspace(ThreadContext<K>* ctxt, Informati
 
 	if ((m_primaryIndex != null) && (curinfo != null) && (curinfo != topinfo)) {
 
+		// DATABASE-739: fix this for Berkeley API, cannot assume pkey is derived
 		bytearray pkey = null;
 		if (m_keyBuilder->hasHiddenKey() == true) {
 			pkey = m_keyBuilder->getHiddenKey(key);
@@ -8463,6 +8760,7 @@ Information* RealTimeMap<K>::isolateInformation(ThreadContext<K>* ctxt, Informat
 
 	if ((m_primaryIndex != null) && (curinfo != null) && (curinfo != topinfo)) {
 
+		// DATABASE-739: fix this for Berkeley API, cannot assume pkey is derived
 		bytearray pkey = null;
 		if (m_keyBuilder->hasHiddenKey() == true) {
 			pkey = m_keyBuilder->getHiddenKey(key);
@@ -8535,6 +8833,7 @@ Information* RealTimeMap<K>::isolateInformation(ThreadContext<K>* ctxt, Informat
 
 	if ((m_primaryIndex != null) && (curinfo != null) && (curinfo != topinfo)) {
 
+		// DATABASE-739: fix this for Berkeley API, cannot assume pkey is derived
 		bytearray pkey = null;
 		if (m_keyBuilder->hasHiddenKey() == true) {
 			pkey = m_keyBuilder->getHiddenKey(key);
@@ -8594,6 +8893,7 @@ Information* RealTimeMap<K>::isolateInformation(ThreadContext<K>* ctxt, StoryLin
 
 	if ((m_primaryIndex != null) && (curinfo != null) && (curinfo != topinfo)) {
 
+		// DATABASE-739: fix this for Berkeley API, cannot assume pkey is derived
 		bytearray pkey = null;
 		if (m_keyBuilder->hasHiddenKey() == true) {
 			pkey = m_keyBuilder->getHiddenKey(key);
@@ -8624,6 +8924,7 @@ Information* RealTimeMap<K>::versionInformation(Transaction* tx, Information* pr
 
 		preinfo->setUpdating(false);
 
+		// XXX: all past informations must contain their data (DATABASE-2062)
 		if (preinfo->getData() == null) {
 			ThreadContext<K>* ctxt = getTransactionContext(tx);
 			readValue(ctxt, preinfo, key);
@@ -8774,10 +9075,23 @@ void RealTimeMap<K>::validateStoryline(const Information* orginfo, const Informa
 #endif
 
 template<typename K>
+#ifdef DEEP_DISTRIBUTED
+boolean RealTimeMap<K>::putTransaction(const K key, const nbyte* value, WriteOption option, Transaction* tx, LockOption lock, uinttype position, ushorttype index, uinttype compressedOffset, Segment<K>* segment) {
+#else
 boolean RealTimeMap<K>::putTransaction(const K key, const nbyte* value, WriteOption option, Transaction* tx, LockOption lock, uinttype position, ushorttype index, uinttype compressedOffset) {
+#endif
 
 	RealTimeConductor<K>* conductor = (RealTimeConductor<K>*) tx->getConductor(getIdentifier());
 	ThreadContext<K>* ctxt = getConductorContext(tx, conductor);
+
+	boolean lockSegment = true;
+	#ifdef DEEP_DISTRIBUTED
+	if (segment != null) {
+		lockSegment = false;
+	}
+	#else
+	Segment<K>* segment = null;
+	#endif
 
 	tx->setDirty(true);
 
@@ -8851,8 +9165,17 @@ boolean RealTimeMap<K>::putTransaction(const K key, const nbyte* value, WriteOpt
 	Information* newinfo;
 	Information* topinfo = null;
 
-	Segment<K>* segment = getSegment(ctxt, key, true, (option != RESERVED) /* don't fill if reserved, ok to be virtual */);
-	CONTEXT_STACK_HANDLER(K,ctxt,segment,global);
+	boolean unassign = true;
+	if (segment == null) {
+		segment = getSegment(ctxt, key, true, (option != RESERVED) /* don't fill if reserved, ok to be virtual */);
+		#ifdef DEEP_DISTRIBUTED
+		if (segment->getRemoteOwner() == true) {
+			ctxt->setSegment(segment);
+			unassign = false;
+		}
+		#endif
+	}
+	CONTEXT_STACK_HANDLER_LOCK_UNASSIGN(K,ctxt,segment,lockSegment,unassign,global);
 
 	// XXX: note RESERVED put may dupe within same transaction, so we must lookup entry, but filling the segment is not necessary since
 	// any duplicate must be uncommitted and within same transaction's reserved block. 
@@ -8959,9 +9282,9 @@ boolean RealTimeMap<K>::putTransaction(const K key, const nbyte* value, WriteOpt
 			newinfo->setNext(infoEntry->getValue());
 
 			#ifdef DEEP_DEBUG
-			conductor->add(infoEntry->getStoryLine().getStoryLock(), newkey, newinfo, tx);
+			conductor->add(infoEntry->getStoryLine().getStoryLock(), newkey, newinfo, segment, tx);
 			#else
-			conductor->add(infoEntry->getStoryLine().getStoryLock(), newkey, newinfo);
+			conductor->add(infoEntry->getStoryLine().getStoryLock(), newkey, newinfo, segment);
 			#endif
 
 			if (trxinfo->getLevel() != Information::LEVEL_COMMIT) {
@@ -9076,9 +9399,9 @@ boolean RealTimeMap<K>::putTransaction(const K key, const nbyte* value, WriteOpt
 		}
 
 		#ifdef DEEP_DEBUG
-		conductor->add(infoEntry->getStoryLine().getStoryLock(), newkey, newinfo, tx);
+		conductor->add(infoEntry->getStoryLine().getStoryLock(), newkey, newinfo, segment, tx);
 		#else
-		conductor->add(infoEntry->getStoryLine().getStoryLock(), newkey, newinfo);
+		conductor->add(infoEntry->getStoryLine().getStoryLock(), newkey, newinfo, segment);
 		#endif
 
 		if (m_hasSecondaryMaps == true) {
@@ -9148,12 +9471,25 @@ boolean RealTimeMap<K>::putTransaction(const K key, const nbyte* value, WriteOpt
 }
 
 template<typename K>
+#ifdef DEEP_DISTRIBUTED
+boolean RealTimeMap<K>::removeTransaction(const K key, nbyte* value, DeleteOption option, Transaction* tx, LockOption lock, boolean forCompressedUpdate, Segment<K>* segment) {
+#else
 boolean RealTimeMap<K>::removeTransaction(const K key, nbyte* value, DeleteOption option, Transaction* tx, LockOption lock, boolean forCompressedUpdate) {
+#endif
 
 	boolean result = false;
 
 	RealTimeConductor<K>* conductor = (RealTimeConductor<K>*) tx->getConductor(getIdentifier());
 	ThreadContext<K>* ctxt = getConductorContext(tx, conductor);
+
+	boolean lockSegment = true;
+	#ifdef DEEP_DISTRIBUTED
+	if (segment != null) {
+		lockSegment = false;
+	}
+	#else
+	Segment<K>* segment = null;
+	#endif
 
 	tx->setDirty(true);
 
@@ -9161,9 +9497,19 @@ boolean RealTimeMap<K>::removeTransaction(const K key, nbyte* value, DeleteOptio
 	K delkey = key;
 	Information* topinfo = null;
 
-	Segment<K>* segment = getSegment(ctxt, key, false, true);
+	boolean unassign = true;
+	if (segment == null) {
+		segment = getSegment(ctxt, key, false, true);
+		#ifdef DEEP_DISTRIBUTED
+		if (segment->getRemoteOwner() == true) {
+			ctxt->setSegment(segment);
+			unassign = false;
+		}
+		#endif
+	}
+
 	if (segment != null) {
-		CONTEXT_STACK_HANDLER(K,ctxt,segment,global);
+		CONTEXT_STACK_HANDLER_LOCK_UNASSIGN(K,ctxt,segment,lockSegment,unassign,global);
 
 		const SegMapEntry* infoEntry = segment->SegTreeMap::getEntry(key);
 		if (infoEntry != null) {
@@ -9212,9 +9558,9 @@ boolean RealTimeMap<K>::removeTransaction(const K key, nbyte* value, DeleteOptio
 					delinfo->setNext(infoEntry->getValue());
 
 					#ifdef DEEP_DEBUG
-					conductor->add(infoEntry->getStoryLine().getStoryLock(), delkey, delinfo, tx);
+					conductor->add(infoEntry->getStoryLine().getStoryLock(), delkey, delinfo, segment, tx);
 					#else
-					conductor->add(infoEntry->getStoryLine().getStoryLock(), delkey, delinfo);
+					conductor->add(infoEntry->getStoryLine().getStoryLock(), delkey, delinfo, segment);
 					#endif
 
 					if (trxinfo->getLevel() != Information::LEVEL_COMMIT) {
@@ -9269,6 +9615,71 @@ boolean RealTimeMap<K>::removeTransaction(const K key, nbyte* value, DeleteOptio
 
 	return result;
 }
+
+#ifdef DEEP_DISTRIBUTED
+template<typename K>
+void RealTimeMap<K>::addVirtualSegment(Segment<K>* segment) {
+	m_threadContext.writeLock();
+	{
+		// TODO Don't think we want this max viewpoint to reflect virtual changes
+		#if 0
+		if (segment->getMaxViewpoint() > getMaxViewpoint()) {
+			setMaxViewpoint(segment->getMaxViewpoint());
+		}
+		#endif
+		m_branchSegmentTreeMap.TreeMap<K,Segment<K>*>::put(segment->SegTreeMap::firstKey(), segment);
+
+		if (m_mapFacilitator->maintainLiveSummaries() == true) {
+			m_mapFacilitator->addVirtualFirstKey(m_keyBuilder->cloneKey(segment->SegTreeMap::firstKey()), MapFacilitator<K>::isolateVirtualSize(segment), MapFacilitator<K>::isolateMinViewpoint(segment), MapFacilitator<K>::isolateMaxVirtualViewpoint(segment));
+		}
+	}
+	m_threadContext.writeUnlock();
+}
+
+template<typename K>
+void RealTimeMap<K>::updateVirtualSegment(K key, inttype vsize, uinttype minViewpoint, uinttype maxViewpoint) {
+	m_threadContext.writeLock();
+	{
+		const MapEntry<K,Segment<K>*>* index = m_branchSegmentTreeMap.TreeMap<K,Segment<K>*>::floorEntry(key);
+		if (index != null) {
+			Segment<K>* segment = index->getValue();
+			m_mapFacilitator->versionVirtualKeySpace(segment, vsize, minViewpoint, maxViewpoint);
+		}	
+	}
+	m_threadContext.writeUnlock();
+}
+
+template<typename K>
+void RealTimeMap<K>::printSegments() {
+	if (m_branchSegmentTreeMap.TreeMap<K,Segment<K>*>::size() != 0) {
+		m_threadContext.writeLock();
+		{
+			typename TreeMap<K,Segment<K>*>::TreeMapEntrySet stackSegmentSet(true);
+			m_branchSegmentTreeMap.entrySet(&stackSegmentSet);
+
+			MapSegmentEntrySetIterator* segIter = (MapSegmentEntrySetIterator*) stackSegmentSet.reset();
+			while (segIter->MapSegmentEntrySetIterator::hasNext()) {
+				MapEntry<K,Segment<K>*>* entry = segIter->MapSegmentEntrySetIterator::next();
+				Segment<K>* segment = entry->getValue();
+
+				printf("\n----KEY %d V-SIZE %d SIZE %d MIN VIEWPOINT %d MAX VIRT VIEWPOINT %d MAX REAL VIEWPOINT %d ", entry->getKey(), MapFacilitator<K>::isolateVirtualSize(segment, m_mapFacilitator->getVirtualKeySpaceVersion()), segment->size(), MapFacilitator<K>::isolateMinViewpoint(segment, m_mapFacilitator->getVirtualKeySpaceVersion()), MapFacilitator<K>::isolateMaxVirtualViewpoint(segment, m_mapFacilitator->getVirtualKeySpaceVersion()), segment->getMaxRealViewpoint());
+
+				if (segment->getVirtualStoryLine() != null) {
+					QuickListEntry<VirtualInfo*>* node = segment->getVirtualStoryLine()->getHead();
+					while (node != null) {
+						VirtualInfo* entry = node->getEntry();
+						printf("\n\tVERSION %lld VSIZE %d MIN VIEWPOINT %d MAX VIEWPOINT %d ", entry->getVersion(), entry->getVirtualSize(), entry->getMinViewpoint(), entry->getMaxViewpoint());
+		
+						node = node->getNext();
+					}
+				}
+			}
+			printf("\n");
+		}
+		m_threadContext.writeUnlock();
+	}
+}
+#endif
 
 template<typename K>
 boolean RealTimeMap<K>::get(const K key, nbyte* value, ReadOption option, K* retkey, Transaction* tx, LockOption lock, MapInformationEntryIterator* iterator, RealTimeCondition<K>* condition) {
@@ -9362,6 +9773,7 @@ boolean RealTimeMap<K>::get(const K key, nbyte* value, ReadOption option, K* ret
 				tx->setDirty(true);
 
 				if (m_primaryIndex != null) {
+					// DATABASE-739: fix this for Berkeley API, cannot assume pkey is derived
 					bytearray pkey = null;
 					if (m_keyBuilder->hasHiddenKey() == true) {
 						pkey = m_keyBuilder->getHiddenKey(setkey);
@@ -9454,6 +9866,7 @@ boolean RealTimeMap<K>::remove(const K key, nbyte* value, DeleteOption option, T
 		throw InvalidException("Invalid state: not running");
 	}
 
+	// DATABASE-739: allow for this and lock/remove primary and all other secondary maps
 	if (m_primaryIndex != null) {
 		DEEP_LOG(ERROR, OTHER, "Remove: secondary not supported yet, %s\n", getFilePath());
 
@@ -9753,7 +10166,7 @@ longtype RealTimeMap<K>::range(const K* skey, const K* ekey, Transaction* tx) {
 				goto RETRY;
 			}
 
-			// XXX: more accurately estimate keys in range for beginning segment, helps with small ranges
+			// XXX: more accurately estimate keys in range for beginning segment, helps with small ranges (see DATABASE-1501)
 			if ((total == 0) && (m_keyBuilder->getKeyParts() > 1)) {
 				total += m_keyBuilder->range(startKey, endKey, segment->vsize(), segment->getCardinality());
 

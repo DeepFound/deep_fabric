@@ -29,9 +29,9 @@
 #define COM_DEEPIS_DB_STORE_RELATIVE_UTIL_BASICARRAY_H_ 
 
 #include "cxx/lang/System.h"
-#include "cxx/util/Logger.h"
-#include "cxx/util/Converter.h"
 #include "cxx/util/Collections.h"
+#include "cxx/util/Converter.h"
+#include "cxx/util/Logger.h"
 
 #include "com/deepis/db/store/relative/util/InvalidException.h"
 

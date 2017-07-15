@@ -247,7 +247,11 @@ class Transaction : public SynchronizableSafe {
 
 		const ushorttype m_identifier;
 		uinttype m_viewpoint;
-
+		#ifdef DEEP_DISTRIBUTED
+		uinttype m_commitViewpoint;
+		boolean m_checkRemoteOwner;
+		longtype m_virtualKeySpaceVersion;
+		#endif
 		ushorttype m_waitIdentifier;
 		ushorttype m_lastFileIndex;
 		uinttype m_sequence;
@@ -591,7 +595,7 @@ class Transaction : public SynchronizableSafe {
 					views++;
 				}
 
-				/* TODO: sequence number will wrap if system is never forced to idle
+				/* DATABASE-738: sequence number will wrap if system is never forced to idle
 				if (viewpoint == 0) {
 					s_viewpointSequence = 0;
 				}
@@ -687,6 +691,11 @@ class Transaction : public SynchronizableSafe {
 			m_isolation(getGlobalIsolation()),
 			m_identifier(identifier),
 			m_viewpoint(0),
+			#ifdef DEEP_DISTRIBUTED
+			m_commitViewpoint(0),
+			m_checkRemoteOwner(true),
+			m_virtualKeySpaceVersion(0),
+			#endif
 			m_waitIdentifier(0),
 			m_lastFileIndex(0),
 			m_sequence(sequence),
@@ -754,6 +763,32 @@ class Transaction : public SynchronizableSafe {
 			return m_viewpoint;
 		}
 
+		#ifdef DEEP_DISTRIBUTED
+		FORCE_INLINE void setCommitViewpoint(uinttype viewpoint) {
+			m_commitViewpoint = viewpoint;
+		}
+
+		FORCE_INLINE uinttype getCommitViewpoint(void) const {
+			return m_commitViewpoint;
+		}
+
+		FORCE_INLINE void setCheckRemoteOwner(boolean check) {
+			m_checkRemoteOwner = check;
+		}
+
+		FORCE_INLINE boolean getCheckRemoteOwner(void) const {
+			return m_checkRemoteOwner;
+		}
+
+		FORCE_INLINE void setVirtualKeySpaceVersion(longtype version) {
+			m_virtualKeySpaceVersion = version;
+		}
+		
+		FORCE_INLINE longtype getVirtualKeySpaceVersion() const {
+			return m_virtualKeySpaceVersion;
+		}
+		#endif
+
 		FORCE_INLINE void setLastFileIndex(ushorttype fileIndex) {
 			m_lastFileIndex = fileIndex;
 		}
@@ -783,6 +818,9 @@ class Transaction : public SynchronizableSafe {
 
 			if (m_dirty == false) {
 				m_viewpoint = 0;
+				#ifdef DEEP_DISTRIBUTED
+				m_commitViewpoint = 0;
+				#endif
 				m_large = false;
 				m_purge = false;
 				#ifdef DEEP_COMPRESS_PRIMARY_READ
@@ -984,7 +1022,7 @@ class Transaction : public SynchronizableSafe {
 		}
 
 		FORCE_INLINE void prepare(shorttype level) {
-			/* TODO: finish prepare logic
+			/* DATABASE-190: finish prepare logic
 			ConductorEntrySetIterator* iter = (ConductorEntrySetIterator*) m_conductorSet.reset();
 			while (iter->ConductorEntrySetIterator::hasNext()) {
 				MapEntry<longtype,Conductor*>* entry = iter->ConductorEntrySetIterator::next();
@@ -992,7 +1030,7 @@ class Transaction : public SynchronizableSafe {
 				Conductor* conductor = entry->getValue();
 				CXX_LANG_MEMORY_DEBUG_ASSERT(conductor);
 
-				// TODO: finish deactive logic
+				// DATABASE-564: finish deactive logic
 				//if (conductor->getDeactivated() == false) {
 					conductor->prepare(level);
 				//}
@@ -1071,7 +1109,7 @@ class Transaction : public SynchronizableSafe {
 							}
 
 
-							// TODO: finish deactive logic
+							// DATABASE-564: finish deactive logic
 							//if (conductor->getDeactivated() == false) {
 								conductor->commit(level, 2 /* durable-phase1 */);
 							//}
@@ -1131,7 +1169,7 @@ class Transaction : public SynchronizableSafe {
 
 					CXX_LANG_MEMORY_DEBUG_ASSERT(conductor);
 
-					// TODO: finish deactive logic
+					// DATABASE-564: finish deactive logic
 					//if (conductor->getDeactivated() == false) {
 						#ifdef DEEP_SYNCHRONIZATION_GROUPING
 						conductor->commit(level, Properties::getDurable() /* 0=non-durable, 1=durable-phase2 */);
@@ -1171,7 +1209,7 @@ class Transaction : public SynchronizableSafe {
 					Conductor* conductor = entry->getValue();
 					CXX_LANG_MEMORY_DEBUG_ASSERT(conductor);
 
-					// TODO: finish deactive logic
+					// DATABASE-564: finish deactive logic
 					//if (conductor->getDeactivated() == false) {
 						conductor->rollback(level);
 					//}

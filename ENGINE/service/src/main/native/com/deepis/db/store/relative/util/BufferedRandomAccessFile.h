@@ -30,11 +30,12 @@
 
 #include <zlib.h>
 
-#include "cxx/util/Logger.h"
+
 #include "cxx/io/IOException.h"
 #include "cxx/io/EOFException.h"
 #include "cxx/io/RandomAccessFile.h"
 #include "com/deepis/db/store/relative/util/InvalidException.h"
+#include "cxx/util/Logger.h"
 
 using namespace std;
 using namespace cxx::io;

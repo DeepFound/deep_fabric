@@ -32,6 +32,8 @@
 #include "cxx/util/TreeMap.h"
 #include "com/deepis/db/store/relative/core/Information.h"
 
+using namespace cxx::util;
+
 namespace com { namespace deepis { namespace db { namespace store { namespace relative { namespace core {
 
 template<typename K>

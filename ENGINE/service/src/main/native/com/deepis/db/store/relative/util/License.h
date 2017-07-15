@@ -32,6 +32,7 @@
 
 namespace com { namespace deepis { namespace db { namespace store { namespace relative { namespace util {
 
+
 class License {	
 
 	private:
@@ -161,7 +162,9 @@ class License {
 			return status;
 		}
 
-		/* XXX: Decode a given license and log license info to file */
+		/*
+		Decode a given license and log license info to file
+		*/
 		static void logActivationStatus(const char* key) {
 			DeepLicense deepLicense(key);
 
@@ -191,7 +194,7 @@ class License {
 			}
 		}
 
-		/* XXX:
+		/*
 		Return machine data - Options:
 		Return a volume id
 		Return the lowest value mac
@@ -205,10 +208,10 @@ class License {
 
 			for (inttype i = 0; i < list->size(); i++) {
 				String* item = list->get(i);
+				//String tmpmac = "";
 
-				if (*item == "." || *item == "..") {
+				if(*item == "." || *item == "..")
 					continue;
-				}
 
 				String fname = dname;
 				fname.append(*item);
@@ -239,7 +242,7 @@ class License {
 			return mac;
 		}
 	
-		/* XXX:
+		/*
 		Read in some unique machine data
 		encode it a little bit
 		*/

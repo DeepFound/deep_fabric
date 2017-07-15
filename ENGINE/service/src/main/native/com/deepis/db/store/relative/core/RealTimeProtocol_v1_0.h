@@ -891,6 +891,7 @@ struct RealTimeProtocol_v1_0_0_0 {
 	}
 
 	FORCE_INLINE static boolean keyWriteAccess(StoryLine& storyLine, Information* info, uinttype viewpoint, boolean rebuild, boolean* dirty) {
+		// DATABASE-1223
 		boolean writable = (info->getLevel() == Information::LEVEL_COMMIT) && ((info->getNext() == null) || (viewpoint != 0));
 		if (writable == false) {
 			*dirty = true;

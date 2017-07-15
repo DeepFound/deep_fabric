@@ -71,6 +71,15 @@ using namespace cxx::util::concurrent::locks;
 using namespace cxx::util::concurrent::atomic;
 using namespace com::deepis::db::store::relative::util;
 
+#ifdef DEEP_DISTRIBUTED
+namespace com { namespace deepis { namespace db { namespace store { namespace relative { namespace distributed {
+template <typename K> class MapFacilitator;
+template <typename K> class VirtualKeySpace;
+template <typename K> class SegmentDataManager;
+} } } } } }
+using namespace com::deepis::db::store::relative::distributed;
+#endif
+
 namespace com { namespace deepis { namespace db { namespace store { namespace relative { namespace core {
 
 template <typename K> class RealTimeIterator;
@@ -244,6 +253,11 @@ class RealTimeMap /* XXX: pseudo-map/tree interface */ : public RealTimeIndex {
 
 		RealTimeResource::Limit m_cycleCacheUsage;
 
+		#ifdef DEEP_DISTRIBUTED
+		MapFacilitator<K>* m_mapFacilitator;
+		uinttype m_maxViewpoint;
+		#endif
+
 		typename TreeMap<K,Segment<K>*>::TreeMapEntrySet m_orderSegmentSet;
 		typename TreeMap<K,Segment<K>*>::TreeMapEntrySet m_purgeSegmentSet;
 		typename SegTreeMap::TreeMapEntrySet m_fillInformationSet;
@@ -286,7 +300,9 @@ class RealTimeMap /* XXX: pseudo-map/tree interface */ : public RealTimeIndex {
 			virtual void recoverComplete(longtype entries, const Locality& locality, longtype elapsed, boolean rebuild = false);
 
 			// XXX: following methods drive thread management
+	public:
 			virtual ConcurrentObject* getThreadContext(void);
+	private:
 			virtual void removeThreadContext(ConcurrentObject* context);
 			virtual void removeThreadContexts(BasicArray<ConcurrentObject*>* contexts);
 			virtual void setContextKey(Transaction* tx, const bytearray bkey /* TODO, int keynum */);
@@ -518,8 +534,17 @@ class RealTimeMap /* XXX: pseudo-map/tree interface */ : public RealTimeIndex {
 
 		FORCE_INLINE Information* versionInformation(Transaction* tx, Information* topinfo, const K key, const nbyte* value, boolean compressed = false);
 
+		#ifdef DEEP_DISTRIBUTED
+		FORCE_INLINE boolean putTransaction(const K key, const nbyte* value, WriteOption option, Transaction* tx, LockOption lock, uinttype position, ushorttype index, uinttype compressedOffset, Segment<K>* segment = null);
+		#else
 		FORCE_INLINE boolean putTransaction(const K key, const nbyte* value, WriteOption option, Transaction* tx, LockOption lock, uinttype position, ushorttype index, uinttype compressedOffset);
+		#endif
+		
+		#ifdef DEEP_DISTRIBUTED
+		FORCE_INLINE boolean removeTransaction(const K key, nbyte* value, DeleteOption option, Transaction* tx, LockOption lock, boolean forCompressedUpdate, Segment<K>* segment = null);
+		#else
 		FORCE_INLINE boolean removeTransaction(const K key, nbyte* value, DeleteOption option, Transaction* tx, LockOption lock, boolean forCompressedUpdate);
+		#endif
 
 		#ifdef DEEP_SYNCHRONIZATION_GROUPING
 		FORCE_INLINE void commit(RealTimeConductor<K>* conductor, bytetype mode) {
@@ -567,6 +592,12 @@ class RealTimeMap /* XXX: pseudo-map/tree interface */ : public RealTimeIndex {
 
 			abortCacheMemory(conductor);
 		}
+
+		#ifdef DEEP_DISTRIBUTED
+		void addVirtualSegment(Segment<K>* segment);
+		void updateVirtualSegment(K key, inttype vsize, uinttype minViewpoint, uinttype maxViewpoint);
+		void printSegments();
+		#endif
 
 	public:
 		RealTimeMap(const char* filepath, const longtype options, const shorttype keySize, const inttype valueSize, const Comparator<K>* = &COMPARATOR, const KeyBuilder<K>* keyBuilder = &KEY_BUILDER, const SchemaBuilder<K>* schemaBuilder = &SCHEMA_BUILDER);
@@ -684,6 +715,24 @@ class RealTimeMap /* XXX: pseudo-map/tree interface */ : public RealTimeIndex {
 			return m_cycleCacheUsage;
 		}
 
+		#ifdef DEEP_DISTRIBUTED
+		FORCE_INLINE void setMapFacilitator(MapFacilitator<K>* mapFacilitator) {
+			m_mapFacilitator = mapFacilitator;
+		}
+
+		FORCE_INLINE MapFacilitator<K>* getMapFacilitator(void) const {
+			return m_mapFacilitator;
+		}
+
+		FORCE_INLINE void setMaxViewpoint(uinttype maxViewpoint) {
+			m_maxViewpoint = maxViewpoint;
+		}
+
+		FORCE_INLINE uinttype getMaxViewpoint(void) const {
+			return m_maxViewpoint;
+		}
+		#endif
+
 	public:
 		virtual const ExtraStatistics* getExtraStats(void) {
 			return &m_extraStats;
@@ -798,6 +847,11 @@ class RealTimeMap /* XXX: pseudo-map/tree interface */ : public RealTimeIndex {
 		friend class RealTimeRecovery<K>;
 		friend class RealTimeConductor<K>;
 		friend class RealTimeUtilities<K>;
+		#ifdef DEEP_DISTRIBUTED
+		friend class MapFacilitator<K>;
+		friend class VirtualKeySpace<K>;
+		friend class SegmentDataManager<K>;
+		#endif
 
 		friend struct RealTimeSchema_v1<K>;
 		friend struct RealTimeAdaptive_v1<K>;

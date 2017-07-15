@@ -842,6 +842,7 @@ struct RealTimeAdaptive_v1 {
 				return false;
 			}
 
+			// XXX: DATABASE-1268
 			if (segment->getValuesCompressed() == true) {
 				return false;
 			}
@@ -945,6 +946,7 @@ struct RealTimeAdaptive_v1 {
 							break;
 						}
 
+						// XXX: temporary fix for DATABASE-1729; moved inside map->m_state check
 						if ((chkinfo != null) && (orginfo == chkinfo)) {
 							*dirty = true;
 							break;
@@ -1196,6 +1198,7 @@ struct RealTimeAdaptive_v1 {
 		}
 
 		static boolean allowFileClobber(RealTimeMap<K>* map, BasicArray<MeasuredRandomAccessFile*>& files, SummaryImpact& report, const boolean needsLock = true) {
+			// XXX: remove on completion of DATABASE-1773
 			if (Properties::getCheckpointMode() == Properties::CHECKPOINT_OFF) {
 				return true;
 			}

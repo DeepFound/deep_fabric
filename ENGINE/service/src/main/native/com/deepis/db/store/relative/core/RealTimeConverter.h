@@ -44,39 +44,6 @@ using namespace com::deepis::db::store::relative::core;
 namespace cxx { namespace util {
 
 template<>
-class Converter<voidptr> {
-	public:
-		static const voidptr NULL_VALUE;
-		static const voidptr RESERVE;
-
-		Converter() {
-		}
-
-		FORCE_INLINE static inttype hashCode(const voidptr o) {
-			throw UnsupportedOperationException("Invalid voidptr hashCode");
-		}
-
-		FORCE_INLINE static boolean equals(voidptr o1, voidptr o2) {
-			throw UnsupportedOperationException("Invalid voidptr equals");
-		}
-
-		FORCE_INLINE static const bytearray toData(const voidptr o) {
-			throw UnsupportedOperationException("Invalid voidptr toData");
-		}
-
-		FORCE_INLINE static void destroy(voidptr o) {
-			// nothing to do
-		}
-
-		FORCE_INLINE static void validate(voidptr o) {
-			// nothing to do
-		}
-};
-
-const voidptr Converter<voidptr>::NULL_VALUE = null;
-const voidptr Converter<voidptr>::RESERVE = (voidptr) &Converter<voidptr>::NULL_VALUE;
-
-template<>
 class Converter<RealTimeResource::Limit> {
 	public:
 		static const RealTimeResource::Limit NULL_VALUE;

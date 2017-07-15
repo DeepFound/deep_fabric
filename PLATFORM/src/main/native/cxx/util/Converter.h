@@ -43,6 +43,10 @@
 
 #include "cxx/util/CompositeKey.h"
 
+#ifdef DEEP_DISTRIBUTED
+#include "cxx/io/EncodeProtocol.h"
+#endif
+
 using namespace cxx::lang;
 
 namespace cxx { namespace util {
@@ -72,6 +76,20 @@ class Converter {
 		FORCE_INLINE static const bytearray toData(T o) {
 			throw UnsupportedOperationException("Invalid bytearray conversion");
 		}
+
+		#ifdef DEEP_DISTRIBUTED
+		FORCE_INLINE static uinttype encodedSize(T o) {
+			throw UnsupportedOperationException("Invalid encoded size");
+		}
+
+		FORCE_INLINE static void encode(cxx::io::encodeProtocol::writer* writer, uinttype field, T o) {
+			throw UnsupportedOperationException("Invalid encode");
+		} 
+
+		FORCE_INLINE static T decode(cxx::io::encodeProtocol::reader* reader, uinttype field) {
+			throw UnsupportedOperationException("Invalid decode");
+		}
+		#endif
 
 		FORCE_INLINE Converter(void) {
 			// nothing to do
@@ -109,6 +127,20 @@ class Converter<boolean> {
 			return (const bytearray) &o;
 		}
 
+		#ifdef DEEP_DISTRIBUTED
+		FORCE_INLINE static uinttype encodedSize(boolean o) {
+			throw UnsupportedOperationException("Invalid encoded size");
+		}
+
+		FORCE_INLINE static void encode(cxx::io::encodeProtocol::writer* writer, uinttype field, boolean o) {
+			throw UnsupportedOperationException("Invalid encode");
+		} 
+
+		FORCE_INLINE static boolean decode(cxx::io::encodeProtocol::reader* reader, uinttype field) {
+			throw UnsupportedOperationException("Invalid decode");
+		}
+		#endif
+
 		FORCE_INLINE Converter(void) {
 			// nothing to do
 		}
@@ -141,6 +173,20 @@ class Converter<chartype> {
 			return (const bytearray) &o;
 		}
 
+		#ifdef DEEP_DISTRIBUTED
+		FORCE_INLINE static uinttype encodedSize(chartype o) {
+			throw UnsupportedOperationException("Invalid encoded size");
+		}
+
+		FORCE_INLINE static void encode(cxx::io::encodeProtocol::writer* writer, uinttype field, chartype o) {
+			throw UnsupportedOperationException("Invalid encode");
+		} 
+
+		FORCE_INLINE static chartype decode(cxx::io::encodeProtocol::reader* reader, uinttype field) {
+			throw UnsupportedOperationException("Invalid decode");
+		}
+		#endif
+
 		FORCE_INLINE Converter(void) {
 			// nothing to do
 		}
@@ -172,6 +218,20 @@ class Converter<uchartype> {
 		FORCE_INLINE static const bytearray toData(const uchartype& o) {
 			return (const bytearray) &o;
 		}
+
+		#ifdef DEEP_DISTRIBUTED
+		FORCE_INLINE static uinttype encodedSize(uchartype o) {
+			throw UnsupportedOperationException("Invalid encoded size");
+		}
+
+		FORCE_INLINE static void encode(cxx::io::encodeProtocol::writer* writer, uinttype field, uchartype o) {
+			throw UnsupportedOperationException("Invalid encode");
+		} 
+
+		FORCE_INLINE static uchartype decode(cxx::io::encodeProtocol::reader* reader, uinttype field) {
+			throw UnsupportedOperationException("Invalid decode");
+		}
+		#endif
 };
 
 template<>
@@ -199,6 +259,20 @@ class Converter<shorttype> {
 		FORCE_INLINE static const bytearray toData(const shorttype& o) {
 			return (const bytearray) &o;
 		}
+
+		#ifdef DEEP_DISTRIBUTED
+		FORCE_INLINE static uinttype encodedSize(shorttype o) {
+			throw UnsupportedOperationException("Invalid encoded size");
+		}
+
+		FORCE_INLINE static void encode(cxx::io::encodeProtocol::writer* writer, uinttype field, shorttype o) {
+			throw UnsupportedOperationException("Invalid encode");
+		} 
+
+		FORCE_INLINE static shorttype decode(cxx::io::encodeProtocol::reader* reader, uinttype field) {
+			throw UnsupportedOperationException("Invalid decode");
+		}
+		#endif
 
 		FORCE_INLINE Converter(void) {
 			// nothing to do
@@ -231,6 +305,20 @@ class Converter<ushorttype> {
 			return (const bytearray) &o;
 		}
 
+		#ifdef DEEP_DISTRIBUTED
+		FORCE_INLINE static uinttype encodedSize(ushorttype o) {
+			throw UnsupportedOperationException("Invalid encoded size");
+		}
+
+		FORCE_INLINE static void encode(cxx::io::encodeProtocol::writer* writer, uinttype field, ushorttype o) {
+			throw UnsupportedOperationException("Invalid encode");
+		} 
+
+		FORCE_INLINE static ushorttype decode(cxx::io::encodeProtocol::reader* reader, uinttype field) {
+			throw UnsupportedOperationException("Invalid decode");
+		}
+		#endif
+
 		FORCE_INLINE Converter(void) {
 			// nothing to do
 		}
@@ -261,6 +349,22 @@ class Converter<inttype> {
 		FORCE_INLINE static const bytearray toData(const inttype& o) {
 			return (const bytearray) &o;
 		}
+
+		#ifdef DEEP_DISTRIBUTED
+		FORCE_INLINE static uinttype encodedSize(const inttype o) {
+			return cxx::io::encodeProtocol::writer::sizeOfUint32(o);
+		}
+
+		FORCE_INLINE static void encode(cxx::io::encodeProtocol::writer* writer, uinttype field, inttype o) {
+			writer->setUint32Field(field, o);
+		} 
+
+		FORCE_INLINE static inttype decode(cxx::io::encodeProtocol::reader* reader, uinttype field) {
+			uinttype key = 0;
+			reader->getUint32Field(field, key);
+			return key;
+		}
+		#endif
 
 		FORCE_INLINE Converter(void) {
 			// nothing to do
@@ -293,6 +397,20 @@ class Converter<uinttype> {
 			return (const bytearray) &o;
 		}
 
+		#ifdef DEEP_DISTRIBUTED
+		FORCE_INLINE static uinttype encodedSize(uinttype o) {
+			throw UnsupportedOperationException("Invalid encoded size");
+		}
+
+		FORCE_INLINE static void encode(cxx::io::encodeProtocol::writer* writer, uinttype field, uinttype o) {
+			throw UnsupportedOperationException("Invalid encode");
+		} 
+
+		FORCE_INLINE static uinttype decode(cxx::io::encodeProtocol::reader* reader, uinttype field) {
+			throw UnsupportedOperationException("Invalid decode");
+		}
+		#endif
+
 		FORCE_INLINE Converter(void) {
 			// nothing to do
 		}
@@ -323,6 +441,20 @@ class Converter<floattype> {
 		FORCE_INLINE static const bytearray toData(const floattype& o) {
 			return (const bytearray) &o;
 		}
+
+		#ifdef DEEP_DISTRIBUTED
+		FORCE_INLINE static uinttype encodedSize(floattype o) {
+			throw UnsupportedOperationException("Invalid encoded size");
+		}
+
+		FORCE_INLINE static void encode(cxx::io::encodeProtocol::writer* writer, uinttype field, floattype o) {
+			throw UnsupportedOperationException("Invalid encode");
+		} 
+
+		FORCE_INLINE static floattype decode(cxx::io::encodeProtocol::reader* reader, uinttype field) {
+			throw UnsupportedOperationException("Invalid decode");
+		}
+		#endif
 
 		FORCE_INLINE Converter(void) {
 			// nothing to do
@@ -355,6 +487,20 @@ class Converter<longtype> {
 			return (const bytearray) &o;
 		}
 
+		#ifdef DEEP_DISTRIBUTED
+		FORCE_INLINE static uinttype encodedSize(longtype o) {
+			throw UnsupportedOperationException("Invalid encoded size");
+		}
+
+		FORCE_INLINE static void encode(cxx::io::encodeProtocol::writer* writer, uinttype field, longtype o) {
+			throw UnsupportedOperationException("Invalid encode");
+		} 
+
+		FORCE_INLINE static longtype decode(cxx::io::encodeProtocol::reader* reader, uinttype field) {
+			throw UnsupportedOperationException("Invalid decode");
+		}
+		#endif
+
 		FORCE_INLINE Converter(void) {
 			// nothing to do
 		}
@@ -385,6 +531,20 @@ class Converter<ulongtype> {
 		FORCE_INLINE static const bytearray toData(const ulongtype& o) {
 			return (const bytearray) &o;
 		}
+
+		#ifdef DEEP_DISTRIBUTED
+		FORCE_INLINE static uinttype encodedSize(ulongtype o) {
+			throw UnsupportedOperationException("Invalid encoded size");
+		}
+
+		FORCE_INLINE static void encode(cxx::io::encodeProtocol::writer* writer, uinttype field, ulongtype o) {
+			throw UnsupportedOperationException("Invalid encode");
+		} 
+
+		FORCE_INLINE static ulongtype decode(cxx::io::encodeProtocol::reader* reader, uinttype field) {
+			throw UnsupportedOperationException("Invalid decode");
+		}
+		#endif
 
 		FORCE_INLINE Converter(void) {
 			// nothing to do
@@ -417,6 +577,20 @@ class Converter<doubletype> {
 			return (const bytearray) &o;
 		}
 
+		#ifdef DEEP_DISTRIBUTED
+		FORCE_INLINE static uinttype encodedSize(doubletype o) {
+			throw UnsupportedOperationException("Invalid encoded size");
+		}
+
+		FORCE_INLINE static void encode(cxx::io::encodeProtocol::writer* writer, uinttype field, doubletype o) {
+			throw UnsupportedOperationException("Invalid encode");
+		} 
+
+		FORCE_INLINE static doubletype decode(cxx::io::encodeProtocol::reader* reader, uinttype field) {
+			throw UnsupportedOperationException("Invalid decode");
+		}
+		#endif
+
 		FORCE_INLINE Converter(void) {
 			// nothing to do
 		}
@@ -447,6 +621,20 @@ class Converter<Object*> {
 		FORCE_INLINE static const bytearray toData(const CompositeKey* o) {
 			throw UnsupportedOperationException("Invalid bytearray conversion");
 		}
+
+		#ifdef DEEP_DISTRIBUTED
+		FORCE_INLINE static uinttype encodedSize(Object* o) {
+			throw UnsupportedOperationException("Invalid encoded size");
+		}
+
+		FORCE_INLINE static void encode(cxx::io::encodeProtocol::writer* writer, uinttype field, Object* o) {
+			throw UnsupportedOperationException("Invalid encode");
+		} 
+
+		FORCE_INLINE static Object* decode(cxx::io::encodeProtocol::reader* reader, uinttype field) {
+			throw UnsupportedOperationException("Invalid decode");
+		}
+		#endif
 
 		FORCE_INLINE Converter(void) {
 			// nothing to do
@@ -479,6 +667,20 @@ class Converter<Short*> {
 			throw UnsupportedOperationException("Invalid bytearray conversion");
 		}
 
+		#ifdef DEEP_DISTRIBUTED
+		FORCE_INLINE static uinttype encodedSize(Short* o) {
+			throw UnsupportedOperationException("Invalid encoded size");
+		}
+
+		FORCE_INLINE static void encode(cxx::io::encodeProtocol::writer* writer, uinttype field, Short* o) {
+			throw UnsupportedOperationException("Invalid encode");
+		} 
+
+		FORCE_INLINE static Short* decode(cxx::io::encodeProtocol::reader* reader, uinttype field) {
+			throw UnsupportedOperationException("Invalid decode");
+		}
+		#endif
+
 		FORCE_INLINE Converter(void) {
 			// nothing to do
 		}
@@ -509,6 +711,20 @@ class Converter<Integer*> {
 		FORCE_INLINE static const bytearray toData(const Integer* o) {
 			throw UnsupportedOperationException("Invalid bytearray conversion");
 		}
+
+		#ifdef DEEP_DISTRIBUTED
+		FORCE_INLINE static uinttype encodedSize(Integer* o) {
+			throw UnsupportedOperationException("Invalid encoded size");
+		}
+
+		FORCE_INLINE static void encode(cxx::io::encodeProtocol::writer* writer, uinttype field, Integer* o) {
+			throw UnsupportedOperationException("Invalid encode");
+		} 
+
+		FORCE_INLINE static Integer* decode(cxx::io::encodeProtocol::reader* reader, uinttype field) {
+			throw UnsupportedOperationException("Invalid decode");
+		}
+		#endif
 
 		FORCE_INLINE Converter(void) {
 			// nothing to do
@@ -541,6 +757,20 @@ class Converter<Float*> {
 			throw UnsupportedOperationException("Invalid bytearray conversion");
 		}
 
+		#ifdef DEEP_DISTRIBUTED
+		FORCE_INLINE static uinttype encodedSize(Float* o) {
+			throw UnsupportedOperationException("Invalid encoded size");
+		}
+
+		FORCE_INLINE static void encode(cxx::io::encodeProtocol::writer* writer, uinttype field, Float* o) {
+			throw UnsupportedOperationException("Invalid encode");
+		} 
+
+		FORCE_INLINE static Float* decode(cxx::io::encodeProtocol::reader* reader, uinttype field) {
+			throw UnsupportedOperationException("Invalid decode");
+		}
+		#endif
+
 		FORCE_INLINE Converter(void) {
 			// nothing to do
 		}
@@ -571,6 +801,20 @@ class Converter<Long*> {
 		FORCE_INLINE static const bytearray toData(const Long* o) {
 			throw UnsupportedOperationException("Invalid bytearray conversion");
 		}
+
+		#ifdef DEEP_DISTRIBUTED
+		FORCE_INLINE static uinttype encodedSize(Long* o) {
+			throw UnsupportedOperationException("Invalid encoded size");
+		}
+
+		FORCE_INLINE static void encode(cxx::io::encodeProtocol::writer* writer, uinttype field, Long* o) {
+			throw UnsupportedOperationException("Invalid encode");
+		} 
+
+		FORCE_INLINE static Long* decode(cxx::io::encodeProtocol::reader* reader, uinttype field) {
+			throw UnsupportedOperationException("Invalid decode");
+		}
+		#endif
 
 		FORCE_INLINE Converter(void) {
 			// nothing to do
@@ -603,6 +847,20 @@ class Converter<String*> {
 			throw UnsupportedOperationException("Invalid bytearray conversion");
 		}
 
+		#ifdef DEEP_DISTRIBUTED
+		FORCE_INLINE static uinttype encodedSize(String* o) {
+			throw UnsupportedOperationException("Invalid encoded size");
+		}
+
+		FORCE_INLINE static void encode(cxx::io::encodeProtocol::writer* writer, uinttype field, String* o) {
+			throw UnsupportedOperationException("Invalid encode");
+		} 
+
+		FORCE_INLINE static String* decode(cxx::io::encodeProtocol::reader* reader, uinttype field) {
+			throw UnsupportedOperationException("Invalid decode");
+		}
+		#endif
+
 		FORCE_INLINE Converter(void) {
 			// nothing to do
 		}
@@ -634,6 +892,20 @@ class Converter<nbyte*> {
 			return *o;
 		}
 
+		#ifdef DEEP_DISTRIBUTED
+		FORCE_INLINE static uinttype encodedSize(nbyte* o) {
+			throw UnsupportedOperationException("Invalid encoded size");
+		}
+
+		FORCE_INLINE static void encode(cxx::io::encodeProtocol::writer* writer, uinttype field, nbyte* o) {
+			throw UnsupportedOperationException("Invalid encode");
+		} 
+
+		FORCE_INLINE static nbyte* decode(cxx::io::encodeProtocol::reader* reader, uinttype field) {
+			throw UnsupportedOperationException("Invalid decode");
+		}
+		#endif
+
 		FORCE_INLINE Converter(void) {
 			// nothing to do
 		}
@@ -664,6 +936,74 @@ class Converter<CompositeKey*> {
 		FORCE_INLINE static const bytearray toData(const CompositeKey* o) {
 			return *o;
 		}
+
+		#ifdef DEEP_DISTRIBUTED
+		FORCE_INLINE static uinttype encodedSize(CompositeKey* o) {
+			throw UnsupportedOperationException("Invalid encoded size");
+		}
+
+		FORCE_INLINE static void encode(cxx::io::encodeProtocol::writer* writer, uinttype field, CompositeKey* o) {
+			throw UnsupportedOperationException("Invalid encode");
+		} 
+
+		FORCE_INLINE static CompositeKey* decode(cxx::io::encodeProtocol::reader* reader, uinttype field) {
+			throw UnsupportedOperationException("Invalid decode");
+		}
+		#endif
+
+		FORCE_INLINE Converter(void) {
+			// nothing to do
+		}
+};
+
+template<>
+class Converter<voidptr> {
+	public:
+		static const voidptr NULL_VALUE;
+		static const voidptr RESERVE;
+
+		FORCE_INLINE static int hashCode(const voidptr o) {
+			long hash   = 0;
+			long offset = 0;
+			int  length = sizeof(o);
+
+			const char* val = (char*)&o;
+			for (int i = 0; i < length; i++) {
+				hash = 31 * hash + val[offset++];
+			}
+
+			return hash;
+		}
+
+		FORCE_INLINE static boolean equals(voidptr o1, voidptr o2) {
+			return o1 == o2;
+		}
+
+		FORCE_INLINE static void destroy(voidptr o) {
+			// nothing to do
+		}
+
+		FORCE_INLINE static void validate(voidptr o) {
+			// nothing to do
+		}
+
+		FORCE_INLINE static const bytearray toData(const voidptr o) {
+			throw UnsupportedOperationException("Invalid bytearray conversion");;
+		}
+
+		#ifdef DEEP_DISTRIBUTED
+		FORCE_INLINE static uinttype encodedSize(voidptr o) {
+			throw UnsupportedOperationException("Invalid encoded size");
+		}
+
+		FORCE_INLINE static void encode(cxx::io::encodeProtocol::writer* writer, uinttype field, voidptr o) {
+			throw UnsupportedOperationException("Invalid encode");
+		} 
+
+		FORCE_INLINE static voidptr decode(cxx::io::encodeProtocol::reader* reader, uinttype field) {
+			throw UnsupportedOperationException("Invalid decode");
+		}
+		#endif
 
 		FORCE_INLINE Converter(void) {
 			// nothing to do

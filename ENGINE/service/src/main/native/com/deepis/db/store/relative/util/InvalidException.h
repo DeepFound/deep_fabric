@@ -31,6 +31,8 @@
 #include "cxx/lang/String.h"
 #include "cxx/lang/RuntimeException.h"
 
+// TODO: move class to fabric.data project
+
 using namespace cxx::lang;
 
 namespace com { namespace deepis { namespace db { namespace store { namespace relative { namespace util {

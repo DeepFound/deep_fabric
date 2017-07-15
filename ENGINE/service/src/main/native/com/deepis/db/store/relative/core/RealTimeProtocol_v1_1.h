@@ -357,9 +357,9 @@ struct WriteKeyPaging {
 		} else {
 			// XXX: force accounting of first key next time around (to ensure flush) in case of concurrent rollback
 			if ((i == 0) && (info->getLevel() == Information::LEVEL_COMMIT)) {
+				// XXX: DATABASE-1759
 				if (info->hasFields(Information::WRITE) == true) {
 					info->setIndexed(map->m_indexValue, false);
-
 				} else {
 					segment->setBeenAltered(true);
 				}
@@ -433,7 +433,6 @@ struct WriteKeyPaging {
 		Information* indexInfo = null;
 
 		if (summary == false) {
-
 			// XXX: see reseed and deletion
 			if ((i == 0) && (keyed == false)) {
 				keyed = true;
@@ -912,6 +911,7 @@ struct RealTimeProtocol_v1_1_0_0 {
 	static const bytetype LRT_FLAG_CLOSING = RealTimeProtocol_v1_0_0_0<V,K>::LRT_FLAG_CLOSING;
 	static const bytetype LRT_FLAG_ROLLING = RealTimeProtocol_v1_0_0_0<V,K>::LRT_FLAG_ROLLING;
 
+	// DATABASE-2199 reserve flag unused? Can I steal this?
 	#if 0
 	static const bytetype LRT_FLAG_RESERVE = 0x04;
 	#else
@@ -2568,6 +2568,7 @@ struct RealTimeProtocol_v1_1_0_0 {
 							#endif
 						}
 
+						// DATABASE-1715
 						#if 0
 						#ifdef DEEP_DEBUG	
 						if (position != vrfile->getLastUncompressedBlockLength()) {
@@ -3028,7 +3029,7 @@ struct RealTimeProtocol_v1_1_0_0 {
 
 				RealTimeProtocol<V,K>::writeLrtEntry(map, lwfile, i, key, info, first, next, marking, cursor, purge, rolling, compressing, conductor->getTransactionId());
 
-				// XXX: only move to next file in non-roll scenario
+				// XXX: DATABASE-1329; only move to next file in non-roll scenario
 				if ((rolling == false) && (vwfile->BufferedRandomAccessFile::getFilePointer() > map->getFileSize()) /* || (lwfile->BufferedRandomAccessFile::getFilePointer() > map->getFileSize()) */) {
 					RealTimeProtocol<V,K>::terminateStreaming(lwfile, vwfile, map);
 

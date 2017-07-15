@@ -101,10 +101,9 @@ class RealTimeDiscover {
 					#if 0
 					vwfile->setProtocol(protocol);
 					#else
-					// TODO: since MapFileUtil validate passed, bump to current protocol
+					// TODO: DATABASE-2171 since MapFileUtil validate passed, bump to current protocol
 					if (protocol <= Versions::PROTOCOL_MINIMUM) {
 						vwfile->setProtocol(Versions::PROTOCOL_MINIMUM);
-
 					} else {
 						vwfile->setProtocol(Versions::GET_PROTOCOL_CURRENT());
 					}
@@ -115,10 +114,9 @@ class RealTimeDiscover {
 					#if 0
 					vrfile->setProtocol(protocol);
 					#else
-					// TODO: since MapFileUtil validate passed, bump to current protocol
+					// TODO: DATABASE-2171 since MapFileUtil validate passed, bump to current protocol
 					if (protocol <= Versions::PROTOCOL_MINIMUM) {
 						vrfile->setProtocol(Versions::PROTOCOL_MINIMUM);
-
 					} else {
 						vrfile->setProtocol(Versions::GET_PROTOCOL_CURRENT());
 					}
@@ -169,10 +167,9 @@ class RealTimeDiscover {
 					#if 0
 					lwfile->setProtocol(protocol);
 					#else
-					// TODO: since MapFileUtil validate passed, bump to current protocol
+					// TODO: DATABASE-2171 since MapFileUtil validate passed, bump to current protocol
 					if (protocol <= Versions::PROTOCOL_MINIMUM) {
 						lwfile->setProtocol(Versions::PROTOCOL_MINIMUM);
-
 					} else {
 						lwfile->setProtocol(Versions::GET_PROTOCOL_CURRENT());
 					}
@@ -238,10 +235,9 @@ class RealTimeDiscover {
 					#if 0 
 					iwfile->setProtocol(protocol);
 					#else
-					// TODO: since MapFileUtil validate passed, bump to current protocol
+					// TODO: DATABASE-2171 since MapFileUtil validate passed, bump to current protocol
 					if (protocol <= Versions::PROTOCOL_MINIMUM) {
 						iwfile->setProtocol(Versions::PROTOCOL_MINIMUM);
-
 					} else {
 						iwfile->setProtocol(Versions::GET_PROTOCOL_CURRENT());
 					}
@@ -253,10 +249,9 @@ class RealTimeDiscover {
 					#if 0 
 					irfile->setProtocol(protocol);
 					#else
-					// TODO: since MapFileUtil validate passed, bump to current protocol
+					// TODO: DATABASE-2171 since MapFileUtil validate passed, bump to current protocol
 					if (protocol <= Versions::PROTOCOL_MINIMUM) {
 						irfile->setProtocol(Versions::PROTOCOL_MINIMUM);
-
 					} else {
 						irfile->setProtocol(Versions::GET_PROTOCOL_CURRENT());
 					}

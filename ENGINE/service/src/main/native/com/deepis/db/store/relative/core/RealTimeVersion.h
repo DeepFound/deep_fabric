@@ -53,7 +53,7 @@ template<typename K>
 struct RealTimeProtocol<RTP_v1_3_0_0, K> : RealTimeProtocol_v1_1_0_0<RTP_v1_3_0_0, K> {
 };
 
-// XXX: note v1_2 uses v1_1 RealTimeProtocol class with V = v1_2 since new behavior is not needed
+// XXX: DATABASE-2171 note v1_2 uses v1_1 RealTimeProtocol class with V = v1_2 since new behavior is not needed
 template<typename K>
 struct RealTimeProtocol<RTP_v1_2_0_0, K> : RealTimeProtocol_v1_1_0_0<RTP_v1_2_0_0, K> {
 };
@@ -113,6 +113,7 @@ class RealTimeVersion {
 		}
 
 		static bytetype validateKeyPaging(MeasuredRandomAccessFile* iwfile, RealTimeMap<K>* map, boolean lastUsed, RealTimeLocality& lastLrtLocality, longtype* lastIrtLength) {
+			// DATABASE-103
 			#if 0
 			if (iwfile->getProtocol() == Versions::GET_PROTOCOL_CURRENT()) {
 			#endif
@@ -122,6 +123,7 @@ class RealTimeVersion {
 					return RealTimeProtocol<RTP_v1_2_0_0,K>::validateKeyPagingSafe(iwfile, map, lastUsed, lastLrtLocality, lastIrtLength);
 				}
 
+			// DATABASE-103
 			#if 0
 			} else if (iwfile->getProtocol() == CT_DATASTORE_PROTO_VER_1_0) {
 				return RealTimeProtocol<RTP_v1_0_0_0,K>::validateKeyPaging(iwfile, map, lastUsed, lastLrtLocality, lastIrtLength);
@@ -143,6 +145,7 @@ class RealTimeVersion {
 		}
 
 		static longtype findSummaryPaging(MeasuredRandomAccessFile* iwfile, RealTimeMap<K>* map, const RealTimeLocality& lastLrtLocality, const uinttype recoveryEpoch) {
+			// DATABASE-103
 			#if 0
 			if (iwfile->getProtocol() == Versions::GET_PROTOCOL_CURRENT()) {
 			#endif
@@ -152,6 +155,7 @@ class RealTimeVersion {
 					return RealTimeProtocol<RTP_v1_2_0_0,K>::findSummaryPaging(iwfile, map, lastLrtLocality, recoveryEpoch);
 				}
 
+			// DATABASE-103
 			#if 0
 			} else if (iwfile->getProtocol() == CT_DATASTORE_PROTO_VER_1_0) {
 				return RealTimeProtocol<RTP_v1_0_0_0,K>::findSummaryPaging(iwfile, map, lastLrtLocality, recoveryEpoch);
@@ -165,6 +169,7 @@ class RealTimeVersion {
 		}
 
 		static boolean summaryRebuildKeyPaging(MeasuredRandomAccessFile* iwfile, RealTimeMap<K>* map) {
+			// DATABASE-103
 			#if 0
 			if (iwfile->getProtocol() == Versions::GET_PROTOCOL_CURRENT()) {
 			#endif
@@ -174,6 +179,7 @@ class RealTimeVersion {
 					return RealTimeProtocol<RTP_v1_2_0_0,K>::summaryRebuildKeyPaging(iwfile, map);
 				}
 
+			// DATABASE-103
 			#if 0
 			} else if (iwfile->getProtocol() == CT_DATASTORE_PROTO_VER_1_0) {
 				return RealTimeProtocol<RTP_v1_0_0_0,K>::summaryRebuildKeyPaging(iwfile, map);
@@ -203,6 +209,7 @@ class RealTimeVersion {
 		}
 
 		static void readKeyPagingIndex(RealTimeMap<K>* map, Segment<K>* segment, ThreadContext<K>* ctxt, BufferedRandomAccessFile* irfile, inttype* xfrag, boolean modification, boolean compression) {
+			// DATABASE-103
 			#if 0
 			if (irfile->getProtocol() == RTP_v1_1_0_0) {
 			#endif
@@ -212,6 +219,7 @@ class RealTimeVersion {
 					RealTimeProtocol<RTP_v1_2_0_0,K>::readKeyPagingIndex(map, segment, ctxt, irfile, xfrag, modification, compression);
 				}
 
+			// DATABASE-103
 			#if 0
 			} else if (irfile->getProtocol() == RTP_v1_0_0_0) {
 				RealTimeProtocol<RTP_v1_0_0_0,K>::readKeyPagingIndex(map, segment, ctxt, irfile, xfrag, modification, compression);
@@ -225,6 +233,7 @@ class RealTimeVersion {
 		}
 
 		static void readPagingInfo(BufferedRandomAccessFile* irfile, RealTimeMap<K>* map, bytetype* flags) {
+			// DATABASE-103
 			#if 0
 			if (irfile->getProtocol() == RTP_v1_1_0_0) {
 			#endif
@@ -234,6 +243,7 @@ class RealTimeVersion {
 					return RealTimeProtocol<RTP_v1_2_0_0,K>::readPagingInfo(irfile, map, flags);
 				}
 
+			// DATABASE-103
 			#if 0
 			} else if (irfile->getProtocol() == RTP_v1_0_0_0) {
 				return RealTimeProtocol<RTP_v1_0_0_0,K>::readPagingInfo(irfile, map, flags);
@@ -249,6 +259,7 @@ class RealTimeVersion {
 		static Information* readPagingInfo(BufferedRandomAccessFile* irfile, RealTimeMap<K>* map, Segment<K>* segment, ThreadContext<K>* ctxt, bytetype* flags) {
 			boolean sequential = false;
 
+			// DATABASE-103
 			#if 0
 			if (irfile->getProtocol() == RTP_v1_1_0_0) {
 			#endif
@@ -258,6 +269,7 @@ class RealTimeVersion {
 					return RealTimeProtocol<RTP_v1_2_0_0,K>::readPagingInfo(irfile, map, segment, ctxt, flags, &sequential, 0 /* frag */, false /* modification */, false /* compression */);
 				}
 
+			// DATABASE-103
 			#if 0
 			} else if (irfile->getProtocol() == RTP_v1_0_0_0) {
 				return RealTimeProtocol<RTP_v1_0_0_0,K>::readPagingInfo(irfile, map, segment, ctxt, flags, &sequential, false /* modification */);
@@ -271,6 +283,7 @@ class RealTimeVersion {
 		}
 
 		static void readMetaHeader(BufferedRandomAccessFile* irfile, RealTimeMap<K>* map, Segment<K>* segment, boolean seek) {
+			// DATABASE-103
 			#if 0
 			if (irfile->getProtocol() == RTP_v1_1_0_0) {
 			#endif
@@ -280,6 +293,7 @@ class RealTimeVersion {
 					RealTimeProtocol<RTP_v1_2_0_0,K>::readMetaHeader(irfile, map, segment, true);
 				}
 
+			// DATABASE-103
 			#if 0
 			} else if (irfile->getProtocol() == RTP_v1_0_0_0) {
 				RealTimeProtocol<RTP_v1_0_0_0,K>::readMetaHeader(irfile, map, segment, true);
@@ -293,6 +307,7 @@ class RealTimeVersion {
 		}
 
 		static void readPagingHeader(BufferedRandomAccessFile* irfile, RealTimeMap<K>* map, Segment<K>* segment, ThreadContext<K>* ctxt) {
+			// DATABASE-103
 			#if 0
 			if (irfile->getProtocol() == RTP_v1_1_0_0) {
 			#endif
@@ -333,6 +348,7 @@ class RealTimeVersion {
 				irfile->setCompress(BufferedRandomAccessFile::COMPRESS_NONE);
 			}	
 
+			// DATABASE-103
 			#if 0
 			} else if (irfile->getProtocol() == RTP_v1_0_0_0) {
 				RealTimeProtocol<RTP_v1_0_0_0,K>::readMetaHeader(irfile, map, segment, true);
@@ -363,6 +379,7 @@ class RealTimeVersion {
 		}
 
 		static void terminateStreaming(MeasuredRandomAccessFile* lwfile, MeasuredRandomAccessFile* vwfile, RealTimeMap<K>* map) {
+			// DATABASE-103
 			#if 0
 			if (lwfile->getProtocol() == CT_DATASTORE_PROTO_VER_1_1) {
 			#endif
@@ -372,6 +389,7 @@ class RealTimeVersion {
 					RealTimeProtocol<RTP_v1_2_0_0,K>::terminateStreaming(lwfile, vwfile, map);
 				}
 
+			// DATABASE-103
 			#if 0
 			} else if (lwfile->getProtocol() == CT_DATASTORE_PROTO_VER_1_0) {
 				return RealTimeProtocol<RTP_v1_0_0_0,K>::terminateStreaming(lwfile, vwfile, map);
@@ -428,6 +446,7 @@ class RealTimeVersion {
 		}
 
 		static void recoverRealTimeProcess(RealTimeMap<K>* map, const ushorttype lrtFileIndex, uinttype lrtFileLength, MapFileSet<MeasuredRandomAccessFile>& lwrites) {
+			// DATABASE-103
 			#if 0
 			MeasuredRandomAccessFile* lwfile = lwrites.get(lrtFileIndex);
 
@@ -439,6 +458,7 @@ class RealTimeVersion {
 					RealTimeProtocol<RTP_v1_2_0_0,K>::recoverRealTimeProcess(map, lrtFileIndex, lrtFileLength, lwrites);
 				}
 
+			// DATABASE-103
 			#if 0
 			} else if (lwfile->getProtocol() == CT_DATASTORE_PROTO_VER_1_0) {
 				RealTimeProtocol<RTP_v1_0_0_0,K>::recoverRealTimeProcess(map, lrtFileIndex, lrtFileLength, lwrites);
@@ -454,6 +474,7 @@ class RealTimeVersion {
  		template <typename RecoveryWorkspace>
  		static void recoveryRead(RealTimeMap<K>* map, BufferedRandomAccessFile& lrfile, inttype& index, longtype& prevKeyPosition, longtype& prevValuePosition, uinttype& lrtFileLength, longtype vend, longtype lend, K key1, RecoveryWorkspace& ws, MapFileSet<MeasuredRandomAccessFile>* lwrites, const ushorttype lrtIndexOffset, const uinttype lrtLengthOffset, uinttype* totalCount, uinttype* deadCount, RealTime** dynamicSecondaries, RealTimeAtomic* atomicCommit, boolean& withinTransaction) {
 
+			// DATABASE-103
 			#if 0
 			if (lrfile.getProtocol() == CT_DATASTORE_PROTO_VER_1_1) {
 			#endif
@@ -463,6 +484,7 @@ class RealTimeVersion {
 					RealTimeProtocol_v1_1_0_0<RTP_v1_2_0_0,K>::recoveryRead(map,lrfile,index, prevKeyPosition,prevValuePosition,lrtFileLength,vend,lend,key1,ws,lwrites,lrtIndexOffset,lrtLengthOffset,totalCount,deadCount,dynamicSecondaries,atomicCommit,withinTransaction);
 				}
 
+			// DATABASE-103
 			#if 0
 			} else if (lrfile.getProtocol() == CT_DATASTORE_PROTO_VER_1_0) {
 				RealTimeProtocol_v1_0_0_0<CT_DATASTORE_PROTO_VER_1_0, K>::recoveryRead(map,lrfile,index, prevKeyPosition,prevValuePosition,lrtFileLength,vend,lend,key1,ws,lwrites,lrtIndexOffset,lrtLengthOffset);

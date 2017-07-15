@@ -9,6 +9,10 @@
 #include "com/deepis/db/store/relative/core/RealTimeMap.cxx"
 #include "com/deepis/db/store/relative/core/RealTimeIterator.h"
 
+#ifdef DEEP_DISTRIBUTED
+#include "com/deepis/db/store/relative/distributed/Library.h"
+#endif
+
 using namespace cxx::lang;
 using namespace cxx::util;
 using namespace com::deepis::core::util;

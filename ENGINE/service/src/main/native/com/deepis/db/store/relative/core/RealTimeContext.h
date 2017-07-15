@@ -32,6 +32,7 @@
 #include "cxx/util/Converter.h"
 
 #include "cxx/util/concurrent/locks/UserSpaceReadWriteLock.h"
+#include "cxx/util/concurrent/atomic/AtomicBoolean.h"
 
 #include "com/deepis/db/store/relative/util/ConcurrentObject.h"
 #include "com/deepis/db/store/relative/util/ConcurrentContainer.h"
@@ -46,9 +47,62 @@
 
 using namespace cxx::util;
 using namespace cxx::util::concurrent::locks;
+using namespace cxx::util::concurrent::atomic;
 using namespace com::deepis::db::store::relative::util;
 
 namespace com { namespace deepis { namespace db { namespace store { namespace relative { namespace core {
+
+#ifdef DEEP_DISTRIBUTED
+template<typename K>
+class DistributedResult {
+	public:
+		DistributedResult() :
+			m_segment(null),
+			m_result(false),
+			m_completed(false),
+			m_data(null) {
+		}
+
+		FORCE_INLINE void setSegment(const Segment<K>* segment) {
+			m_segment = (Segment<K>*) segment;
+		}
+
+		FORCE_INLINE Segment<K>* getSegment() const {
+			return m_segment;
+		}
+
+		FORCE_INLINE void setResult(longtype result) {
+			m_result = result;
+		}
+
+		FORCE_INLINE longtype getResult() const {
+			return m_result;
+		}
+
+		FORCE_INLINE void setCompleted(boolean completed) {
+			m_completed.getAndSet(completed);
+		}
+
+		FORCE_INLINE boolean getCompleted() const {
+			return m_completed.get();
+		}
+
+		FORCE_INLINE void setData(void* data) {
+			m_data = data;
+		}
+
+		FORCE_INLINE void* getData() const {
+			return m_data;
+		}
+
+	private:
+		Segment<K>* m_segment;
+		longtype m_result;
+		AtomicBoolean m_completed;
+
+		void* m_data;
+};
+#endif
 
 template<typename K>
 class ThreadContext : public ConcurrentObject {
@@ -73,6 +127,10 @@ class ThreadContext : public ConcurrentObject {
 		InfoRefBuf m_infoRefBuf;
 		XInfoRef* m_infoRef;
 		Segment<K>* m_segment;
+
+		#ifdef DEEP_DISTRIBUTED
+		DistributedResult<K> m_distributedResult;
+		#endif
 
 		RealTimeCondition<K>* m_condition;
 
@@ -106,6 +164,9 @@ class ThreadContext : public ConcurrentObject {
 			m_transaction(null),
 			m_infoRef(null),
 			m_segment(null),
+			#ifdef DEEP_DISTRIBUTED
+			m_distributedResult(),
+			#endif
 			m_condition(null),
 			m_globalLock(false),
 			m_purgeSetup(false),
@@ -206,6 +267,32 @@ class ThreadContext : public ConcurrentObject {
 
 			return m_segment;
 		}
+
+		#ifdef DEEP_DISTRIBUTED
+		FORCE_INLINE void setDistributedSegment(const Segment<K>* segment) {
+			m_distributedResult.setSegment(segment);
+		}
+
+		FORCE_INLINE Segment<K>* getDistributedSegment() const {
+			return m_distributedResult.getSegment();
+		}
+
+		FORCE_INLINE void setDistributedResult(longtype result) {
+			m_distributedResult.setResult(result);
+		}
+
+		FORCE_INLINE longtype getDistributedResult() const {
+			return m_distributedResult.getResult();
+		}
+
+		FORCE_INLINE void setDistributedCompleted(boolean completed) {
+			m_distributedResult.setCompleted(completed);
+		}
+
+		FORCE_INLINE boolean getDistributedCompleted() const {
+			return m_distributedResult.getCompleted();
+		}
+		#endif
 
 		#ifdef CXX_LANG_MEMORY_DEBUG
 		FORCE_INLINE void setTransaction(Transaction* tx, boolean ignore) {
@@ -421,14 +508,20 @@ class ContextHandle {
 
 	private:
 		ThreadContext<K>* m_context;
+		boolean m_unlock;
+		boolean m_unassign;
 
 	public:
 		FORCE_INLINE ContextHandle(ThreadContext<K>* context):
-			m_context(context) {
+			m_context(context),
+			m_unlock(true),
+			m_unassign(true) {
 		}
 
-		FORCE_INLINE ContextHandle(ThreadContext<K>* context, Segment<K>* segment):
-			m_context(context) {
+		FORCE_INLINE ContextHandle(ThreadContext<K>* context, Segment<K>* segment, boolean unlock = true, boolean unassign = true):
+			m_context(context),
+			m_unlock(unlock),
+			m_unassign(unassign) {
 
 			m_context->setSegment(segment);
 		}
@@ -456,11 +549,13 @@ class ContextHandle {
 
 		FORCE_INLINE void release(void) {
 			Segment<K>* segment = getSegment();
-			if (segment != null) {
+			if ((segment != null) && (m_unlock == true)) {
 				segment->unlock();
 			}
 
-			unassign();
+			if (m_unassign == true) {
+				unassign();
+			}
 		}
 };
 
@@ -471,6 +566,8 @@ class ContextHandle {
 #define CONTEXT_STACK_RELEASE(name) CONTEXT_STACK_OBJECT(name).release();
 #define CONTEXT_STACK_UNASSIGN(name) CONTEXT_STACK_OBJECT(name).unassign();
 #define CONTEXT_STACK_HANDLER(K,context,object,name) ContextHandle<K> CONTEXT_STACK_OBJECT(name)(context, object);
+#define CONTEXT_STACK_HANDLER_LOCK(K,context,object,unlock,name) ContextHandle<K> CONTEXT_STACK_OBJECT(name)(context, object, unlock);
+#define CONTEXT_STACK_HANDLER_LOCK_UNASSIGN(K,context,object,unlock,unassign,name) ContextHandle<K> CONTEXT_STACK_OBJECT(name)(context, object, unlock, unassign);
 
 } } } } } } // namespace
 

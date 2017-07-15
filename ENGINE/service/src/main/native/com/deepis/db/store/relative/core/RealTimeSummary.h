@@ -759,6 +759,7 @@ struct RealTimeSummary {
 
 			if (segment->getSummary() == true) {
 				if (m_sumSegment.SegTreeMap::size() > 0) {
+					// DATABASE-1959: flush summary to prevent potential overlap
 					indexSummary(map, ctxt);
 				}
 		

@@ -128,7 +128,7 @@ uinttype BufferedRandomAccessFile::compressToBuffer(const nbyte* bytes, int offs
 	}
 	#endif
 
-	// XXX: force a new compressed block if we are going to exceed the max uncompressed size	
+	//XXX: force a new compressed block if we are going to exceed the max uncompressed size	
 	if ((finalizeMode == FINALIZE_NONE) && (m_inZstream != null) && ((m_inZstream->total_in + length) >= MAX_UNCOMPRESSED_SIZE)) {
 		blockCompression();
 	}
@@ -190,7 +190,7 @@ uinttype BufferedRandomAccessFile::compressToBuffer(bytetype b) {
 	inttype code;
 	boolean firstCycle = false;
 
-	// XXX: force a new compressed block if we are going to exceed the max uncompressed size	
+	//XXX: force a new compressed block if we are going to exceed the max uncompressed size	
 	if ((m_inZstream != null) && ((m_inZstream->total_in + 1) >= MAX_UNCOMPRESSED_SIZE)) {
 		blockCompression();
 	}

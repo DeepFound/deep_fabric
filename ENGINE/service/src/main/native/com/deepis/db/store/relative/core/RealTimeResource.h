@@ -457,6 +457,7 @@ class RealTimeResource : public Synchronizable, private Runnable {
 
 					for (int i = 0, j = 0; (s_exit == false) && (i < m_rtObjects.ArrayList<RealTime*>::size()); i++, j++) {
 
+						// XXX: DATABASE-1729
 						// XXX: indexing can take a while (e.g. reorg), use flag to speed up shutdown
 						if (s_shutdown == true) {
 							break;
@@ -661,6 +662,7 @@ class RealTimeResource : public Synchronizable, private Runnable {
 					}
 				}
 
+				// XXX: DATABASE-1729
 				for (unsigned i = 1; (s_exit == false) && (s_shutdown == false); i++) {
 
 					Thread::sleep(Properties::DEFAULT_CACHE_SLEEP);
@@ -774,6 +776,7 @@ class RealTimeResource : public Synchronizable, private Runnable {
 		FORCE_INLINE static void immediateShutdown(void) {
 			s_shutdown = true;
 
+			// XXX: DATABASE-1729
 			#if 0
 			s_rtReadWriteLock.readLock()->lock();
 			s_rtObjects.lock();

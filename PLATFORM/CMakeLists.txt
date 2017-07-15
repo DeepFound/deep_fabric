@@ -16,6 +16,9 @@ include(${TOP}/build/cmake/Common.cmake)
 set(DEEPIS_PLATFORM_INC ${CMAKE_SOURCE_DIR}/src/main/native)
 
 include_directories(${DEEPIS_STANDARD_INCS} ${DEEPIS_PLATFORM_INC})
+include_directories(${DEEPIS_STANDARD_INCS} ${DEEPIS_LIBZMQ_INC})
+include_directories(${DEEPIS_STANDARD_INCS} ${DEEPIS_TXOBJECT_INC})
+include_directories(${DEEPIS_STANDARD_INCS} ${DEEPIS_PROTOBUF_INC})
 
 #
 # Source Files
@@ -41,6 +44,8 @@ set (DEEPIS_PLATFORM_SRC
   src/main/native/cxx/io/FileDescriptor.cxx
   src/main/native/cxx/io/FileUtil.cxx 
   src/main/native/cxx/io/RandomAccessFile.cxx
+  src/main/native/cxx/io/LinkManager.cxx
+  src/main/native/cxx/io/MessageManager.cxx
 
   # org/w3c/dom
   src/main/native/org/w3c/dom/Node.cxx)
@@ -69,6 +74,12 @@ file(APPEND ${PLATFORM_CONFIG_FILE} "include(${PLATFORM_EXPORTS_FILE})\n")
 #
 # Test
 #
+add_deep_test(TestUUID src/test/native/cxx/util/TestUUID.cxx ${DEEPIS_TEST_LIBS})
+add_deep_test(TestBinaryWireFormat src/test/native/cxx/io/TestBinaryWireFormat.cxx ${DEEPIS_TEST_LIBS})
+add_deep_test(TestPrettyPrint src/test/native/cxx/util/TestPrettyPrint.cxx ${DEEPIS_TEST_LIBS})
+add_deep_test(TestTime src/test/native/cxx/util/TestTime.cxx ${DEEPIS_TEST_LIBS})
+add_deep_test(TestLinkManager src/test/native/cxx/io/TestLinkManager.cxx ${DEEPIS_TEST_LIBS})
+add_deep_test(TestMessageManager src/test/native/cxx/io/TestMessageManager.cxx ${DEEPIS_TEST_LIBS})
 add_deep_test(LangTest src/test/native/cxx/lang/TestUnit.cxx ${DEEPIS_TEST_LIBS})
 add_deep_test(IoTest src/test/native/cxx/io/TestUnit.cxx ${DEEPIS_TEST_LIBS})
 add_deep_test(UtilTest src/test/native/cxx/util/TestUnit.cxx ${DEEPIS_TEST_LIBS})

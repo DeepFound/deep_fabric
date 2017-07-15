@@ -29,11 +29,11 @@
 #define CXX_LANG_DYNAMIC_RESOURCE_H_
 
 #include <stdio.h>
+#include <sys/types.h>
 #include <unistd.h>
 #include <errno.h>
-#include <fstream>
-#include <sys/types.h>
 #include <sys/resource.h>
+#include <fstream>
 
 #include "cxx/lang/nbyte.h"
 #include "cxx/lang/types.h"
@@ -51,14 +51,14 @@ class DynamicUtils {
 
  public:
 
-	// XXX: Ensure we cleanup the global static instance of this DynamicResource Class.
+	// Ensure we cleanup the global static instance of this DynamicResource Class.
 	virtual ~DynamicUtils() {
 		if ((null != DynamicUtils::m_cDynamicResourceInstance) && (DynamicUtils::m_cDynamicResourceInstance == this)) {
 			DynamicUtils::m_cDynamicResourceInstance = null;
 		}
 	}
 
-	// XXX: Returns the singleton instance for the DynamicResource object.
+	// Returns the singleton instance for the DynamicResource object.
 	static DynamicUtils* getInstance() {
 		if (null == DynamicUtils::m_cDynamicResourceInstance) {
 			DynamicUtils::m_cDynamicResourceInstance = new DynamicUtils();
@@ -70,7 +70,7 @@ class DynamicUtils {
 	inttype checkForProcessorChange(void) {
 		inttype iCount = envOverride<inttype>("DEEP_CORES", Runtime::getRuntime()->availableProcessors());
 
-		/* XXX: Function converts cores into a thread count that has a bounded range. */
+		/* Function converts cores into a thread count that has a bounded range. */
 		inttype availWorkThreads = iCount >> 1;
 
 		if (Properties::DEFAULT_CACHE_WORK_THREADS_MIN > availWorkThreads) {
@@ -102,14 +102,14 @@ class DynamicUtils {
 
 		allAvailableMemory = allAvailableMemory * Properties::DEFAULT_CACHE_PERCENT_DEFAULT;
 
-		/* XXX: If dynamic resources is configured. */
+		/* If dynamic resources is configured. */
 		if (cacheSizeActual < allAvailableMemory) {
 			DEEP_LOG(INFO, CACHE, "Dynamic Resource memory from %llu Bytes to %llu Bytes\n", cacheSizeActual, allAvailableMemory);
 
 			Properties::setCacheSize(allAvailableMemory);
 
 		} else if (cacheSizeActual != allAvailableMemory) {
-			/* XXX: Dynamic downscaling of memory is not currently supported. */
+			/* Dynamic downscaling of memory is not currently supported. */
 		}
 	}
 
@@ -131,17 +131,17 @@ class DynamicUtils {
 
  private:
 
-	#ifdef DEEP_DEBUG
+#ifdef DEEP_DEBUG
 	FORCE_INLINE static bool checkForFile(char* pPath) {
 		struct stat buffer;
 		return (stat(pPath, &buffer) == 0);
 	}
-	#endif
+#endif
 
 	template<typename T>
 	FORCE_INLINE static T envOverride(const char* pEnv, T iDefault) {
 		T     iRetVal = iDefault;
-		#ifdef DEEP_DEBUG
+#ifdef DEEP_DEBUG
 		char* pPath   = getenv(pEnv);
 
 		if ((0 != pPath) && (false != checkForFile(pPath))) {
@@ -156,11 +156,11 @@ class DynamicUtils {
 				iRetVal = iDefault;
 			}
 		}
-		#endif
+#endif
 		return iRetVal;
 	}
 
-};
+}; // DynamicUtils
 
 DynamicUtils* DynamicUtils::m_cDynamicResourceInstance = null;
 
